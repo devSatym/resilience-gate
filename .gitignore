@@ -1,0 +1,58 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local runtime / logs
+*.log
+tmp/
+
+# Private local planning material
+.plan/
+
+# Terraform
+.terraform/
+!gke_terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Personal planning notes that are not part of the repository roadmap
+chaos-promotion-project-plan*.md
+LEARNINGS.md
+action-items.md
+CLAUDE.md
+PROJECT_CONTEXT.md
+docs/interview-demo.md
+
+scratch/
+K8-project-screenshots/
