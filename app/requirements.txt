@@ -1,0 +1,13 @@
+# Direct runtime dependencies for the URL-shortener service.
+#
+# Keep this file limited to packages imported by app/.  app/requirements.lock
+# pins the complete, resolved Linux/Python 3.12 environment used by CI and
+# container builds; regenerate that lock deliberately when changing a pin.
+asyncpg==0.31.0
+fastapi==0.142.2
+httpx==0.28.1
+prometheus-client==0.26.0
+prometheus-fastapi-instrumentator==8.1.0
+pydantic==2.13.5
+redis==8.1.0
+uvicorn[standard]==0.54.0
