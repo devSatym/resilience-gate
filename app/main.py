@@ -8,12 +8,16 @@ running database or cache.
 from __future__ import annotations
 
 import os
+import secrets
+import string
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
+from collections.abc import Callable
 from urllib.parse import urlsplit
 
 import asyncpg
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
 
@@ -112,9 +116,17 @@ class Database:
             return await connection.fetchrow(query, *args)
 
 
+ALPHABET = string.ascii_letters + string.digits
+
+
+def generate_code(length: int) -> str:
+    return "".join(secrets.choice(ALPHABET) for _ in range(length))
+
+
 def create_app(
     settings: Settings | None = None,
     database: Database | None = None,
+    code_generator: Callable[[], str] | None = None,
 ) -> FastAPI:
     """Build the ASGI application without connecting to infrastructure."""
 
@@ -136,10 +148,66 @@ def create_app(
     )
     application.state.settings = configured
     application.state.database = store
+    create_code = code_generator or (lambda: generate_code(configured.code_length))
 
     @application.get("/")
     async def index() -> dict[str, str]:
         return {"service": "url-shortener", "status": "configured"}
+
+    @application.post("/shorten", status_code=201)
+    async def shorten(request: ShortenRequest):
+        """Create one short code per destination URL, reusing an existing one."""
+
+        try:
+            existing = await store.fetchrow(
+                "SELECT code FROM urls WHERE url = $1", request.url
+            )
+            if existing is not None:
+                return JSONResponse(
+                    {
+                        "code": existing["code"],
+                        "short_url": f"{configured.base_url}/{existing['code']}",
+                        "original_url": request.url,
+                    },
+                    status_code=200,
+                )
+
+            # A collision is extremely unlikely, but each insertion is still
+            # conflict-safe and the URL is re-read before returning failure.
+            for _ in range(3):
+                code = create_code()
+                created = await store.fetchrow(
+                    """
+                    INSERT INTO urls (code, url) VALUES ($1, $2)
+                    ON CONFLICT DO NOTHING
+                    RETURNING code
+                    """,
+                    code,
+                    request.url,
+                )
+                if created is not None:
+                    return {
+                        "code": created["code"],
+                        "short_url": f"{configured.base_url}/{created['code']}",
+                        "original_url": request.url,
+                    }
+
+                existing = await store.fetchrow(
+                    "SELECT code FROM urls WHERE url = $1", request.url
+                )
+                if existing is not None:
+                    return JSONResponse(
+                        {
+                            "code": existing["code"],
+                            "short_url": f"{configured.base_url}/{existing['code']}",
+                            "original_url": request.url,
+                        },
+                        status_code=200,
+                    )
+        except DatabaseUnavailable as exc:
+            raise HTTPException(status_code=503, detail="database unavailable") from exc
+
+        raise HTTPException(status_code=503, detail="could not allocate a short code")
 
     return application
 
