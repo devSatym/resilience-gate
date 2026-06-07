@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 import asyncpg
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, field_validator
 
 
@@ -208,6 +208,18 @@ def create_app(
             raise HTTPException(status_code=503, detail="database unavailable") from exc
 
         raise HTTPException(status_code=503, detail="could not allocate a short code")
+
+    @application.get("/{code}")
+    async def redirect(code: str) -> RedirectResponse:
+        """Resolve a short code from Postgres and issue a temporary redirect."""
+
+        try:
+            row = await store.fetchrow("SELECT url FROM urls WHERE code = $1", code)
+        except DatabaseUnavailable as exc:
+            raise HTTPException(status_code=503, detail="database unavailable") from exc
+        if row is None:
+            raise HTTPException(status_code=404, detail="short code not found")
+        return RedirectResponse(url=row["url"], status_code=302)
 
     return application
 
