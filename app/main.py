@@ -16,6 +16,7 @@ from collections.abc import Callable
 from urllib.parse import urlsplit
 
 import asyncpg
+import redis.asyncio as aioredis
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, field_validator
@@ -29,6 +30,7 @@ class Settings:
     code_length: int
     database_url: str
     redis_url: str
+    redis_ttl_seconds: int = 3600
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -44,6 +46,7 @@ class Settings:
                 "postgresql://urlshortener:password@localhost:5432/urlshortener",
             ),
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+            redis_ttl_seconds=int(os.getenv("REDIS_TTL_SECONDS", "3600")),
         )
 
 
@@ -116,6 +119,56 @@ class Database:
             return await connection.fetchrow(query, *args)
 
 
+class CacheUnavailable(RuntimeError):
+    """Raised only at the cache boundary; callers fall back to Postgres."""
+
+
+class Cache:
+    """Bounded Redis cache that is never authoritative for URL resolution."""
+
+    def __init__(self, url: str, ttl_seconds: int) -> None:
+        self.url = url
+        self.ttl_seconds = ttl_seconds
+        self.client: aioredis.Redis | None = None
+
+    async def connect(self) -> None:
+        try:
+            client = aioredis.from_url(
+                self.url,
+                decode_responses=True,
+                socket_connect_timeout=0.2,
+                socket_timeout=0.2,
+            )
+            await client.ping()
+            self.client = client
+        except Exception:
+            # Redis is an optimisation.  Keep the service usable through its
+            # Postgres source of truth when the cache starts unavailable.
+            self.client = None
+
+    async def close(self) -> None:
+        if self.client is not None:
+            await self.client.aclose()
+            self.client = None
+
+    def _client(self) -> aioredis.Redis:
+        if self.client is None:
+            raise CacheUnavailable("cache is not ready")
+        return self.client
+
+    async def get(self, code: str) -> str | None:
+        try:
+            return await self._client().get(f"url:{code}")
+        except Exception as exc:
+            raise CacheUnavailable("cache read failed") from exc
+
+    async def set(self, code: str, url: str) -> None:
+        try:
+            await self._client().setex(f"url:{code}", self.ttl_seconds, url)
+        except Exception as exc:
+            raise CacheUnavailable("cache write failed") from exc
+
+
 ALPHABET = string.ascii_letters + string.digits
 
 
@@ -126,19 +179,23 @@ def generate_code(length: int) -> str:
 def create_app(
     settings: Settings | None = None,
     database: Database | None = None,
+    cache: Cache | None = None,
     code_generator: Callable[[], str] | None = None,
 ) -> FastAPI:
     """Build the ASGI application without connecting to infrastructure."""
 
     configured = settings or Settings.from_env()
     store = database or Database(configured.database_url)
+    url_cache = cache or Cache(configured.redis_url, configured.redis_ttl_seconds)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         await store.connect()
+        await url_cache.connect()
         try:
             yield
         finally:
+            await url_cache.close()
             await store.close()
 
     application = FastAPI(
@@ -148,6 +205,7 @@ def create_app(
     )
     application.state.settings = configured
     application.state.database = store
+    application.state.cache = url_cache
     create_code = code_generator or (lambda: generate_code(configured.code_length))
 
     @application.get("/")
@@ -214,11 +272,22 @@ def create_app(
         """Resolve a short code from Postgres and issue a temporary redirect."""
 
         try:
+            cached_url = await url_cache.get(code)
+            if cached_url:
+                return RedirectResponse(url=cached_url, status_code=302)
+        except CacheUnavailable:
+            pass
+
+        try:
             row = await store.fetchrow("SELECT url FROM urls WHERE code = $1", code)
         except DatabaseUnavailable as exc:
             raise HTTPException(status_code=503, detail="database unavailable") from exc
         if row is None:
             raise HTTPException(status_code=404, detail="short code not found")
+        try:
+            await url_cache.set(code, row["url"])
+        except CacheUnavailable:
+            pass
         return RedirectResponse(url=row["url"], status_code=302)
 
     return application
