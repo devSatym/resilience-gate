@@ -1,0 +1,65 @@
+# Local URL-shortener stack. It is intentionally self-contained: no cloud,
+# wallet, or facilitator credentials are required for this milestone.
+
+services:
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: url-shortener-app
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://urlshortener:password@postgres:5432/urlshortener
+      BASE_URL: http://localhost:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  redis:
+    image: redis:7.4.2-alpine
+    container_name: url-shortener-redis
+    ports:
+      - "6380:6379"   # offset to avoid a locally running redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --appendfsync everysec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      start_period: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: url-shortener-postgres
+    ports:
+      - "5433:5432"   # offset to avoid a locally running postgres
+    environment:
+      POSTGRES_USER: urlshortener
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: urlshortener
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urlshortener -d urlshortener"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 5
+
+volumes:
+  redis_data:
+  postgres_data:
