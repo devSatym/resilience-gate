@@ -212,6 +212,12 @@ def create_app(
     async def index() -> dict[str, str]:
         return {"service": "url-shortener", "status": "configured"}
 
+    @application.get("/livez")
+    async def livez() -> dict[str, str]:
+        """Process-only liveness: dependency failures must never restart a pod."""
+
+        return {"status": "alive"}
+
     @application.post("/shorten", status_code=201)
     async def shorten(request: ShortenRequest):
         """Create one short code per destination URL, reusing an existing one."""
