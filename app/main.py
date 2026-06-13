@@ -118,6 +118,9 @@ class Database:
         async with self._pool().acquire() as connection:
             return await connection.fetchrow(query, *args)
 
+    async def ping(self) -> None:
+        await self.fetchrow("SELECT 1")
+
 
 class CacheUnavailable(RuntimeError):
     """Raised only at the cache boundary; callers fall back to Postgres."""
@@ -161,6 +164,12 @@ class Cache:
             return await self._client().get(f"url:{code}")
         except Exception as exc:
             raise CacheUnavailable("cache read failed") from exc
+
+    async def ping(self) -> None:
+        try:
+            await self._client().ping()
+        except Exception as exc:
+            raise CacheUnavailable("cache ping failed") from exc
 
     async def set(self, code: str, url: str) -> None:
         try:
@@ -206,6 +215,7 @@ def create_app(
     application.state.settings = configured
     application.state.database = store
     application.state.cache = url_cache
+    application.state.has_been_ready = False
     create_code = code_generator or (lambda: generate_code(configured.code_length))
 
     @application.get("/")
@@ -217,6 +227,26 @@ def create_app(
         """Process-only liveness: dependency failures must never restart a pod."""
 
         return {"status": "alive"}
+
+    @application.get("/ready")
+    async def ready() -> dict[str, str]:
+        """Readiness needs Postgres always and Redis only before first success."""
+
+        try:
+            await store.ping()
+        except Exception as exc:
+            # Keep the original dependency exception out of the response, but
+            # never convert it into liveness failure or a 500.
+            raise HTTPException(status_code=503, detail="database not ready") from exc
+
+        if not application.state.has_been_ready:
+            try:
+                await url_cache.ping()
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail="cache not ready") from exc
+            application.state.has_been_ready = True
+
+        return {"status": "ready"}
 
     @application.post("/shorten", status_code=201)
     async def shorten(request: ShortenRequest):
