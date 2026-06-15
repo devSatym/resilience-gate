@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import secrets
 import string
+import asyncio
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from collections.abc import Callable
@@ -31,6 +32,7 @@ class Settings:
     database_url: str
     redis_url: str
     redis_ttl_seconds: int = 3600
+    dependency_timeout_seconds: float = 2.0
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -47,6 +49,9 @@ class Settings:
             ),
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
             redis_ttl_seconds=int(os.getenv("REDIS_TTL_SECONDS", "3600")),
+            dependency_timeout_seconds=float(
+                os.getenv("DEPENDENCY_TIMEOUT_SECONDS", "2")
+            ),
         )
 
 
@@ -87,22 +92,38 @@ class DatabaseUnavailable(RuntimeError):
 class Database:
     """Small asyncpg boundary that owns schema setup and pool lifecycle."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, timeout_seconds: float = 2.0) -> None:
         self.url = url
+        self.timeout_seconds = timeout_seconds
         self.pool: asyncpg.Pool | None = None
+        self._connect_lock = asyncio.Lock()
 
     async def connect(self) -> None:
         if self.pool is not None:
             return
-        pool = await asyncpg.create_pool(
-            self.url,
-            min_size=1,
-            max_size=5,
-            command_timeout=5,
-        )
-        async with pool.acquire() as connection:
-            await connection.execute(SCHEMA_SQL)
-        self.pool = pool
+        async with self._connect_lock:
+            if self.pool is not None:
+                return
+            pool: asyncpg.Pool | None = None
+            try:
+                pool = await asyncio.wait_for(
+                    asyncpg.create_pool(
+                        self.url,
+                        min_size=1,
+                        max_size=5,
+                        command_timeout=self.timeout_seconds,
+                    ),
+                    timeout=self.timeout_seconds,
+                )
+                async with pool.acquire() as connection:
+                    await asyncio.wait_for(
+                        connection.execute(SCHEMA_SQL), timeout=self.timeout_seconds
+                    )
+                self.pool = pool
+            except Exception as exc:
+                if pool is not None:
+                    await pool.close()
+                raise DatabaseUnavailable("database connection failed") from exc
 
     async def close(self) -> None:
         if self.pool is not None:
@@ -119,7 +140,13 @@ class Database:
             return await connection.fetchrow(query, *args)
 
     async def ping(self) -> None:
-        await self.fetchrow("SELECT 1")
+        if self.pool is None:
+            await self.connect()
+        try:
+            await asyncio.wait_for(self.fetchrow("SELECT 1"), timeout=self.timeout_seconds)
+        except Exception as exc:
+            await self.close()
+            raise DatabaseUnavailable("database ping failed") from exc
 
 
 class CacheUnavailable(RuntimeError):
@@ -129,9 +156,10 @@ class CacheUnavailable(RuntimeError):
 class Cache:
     """Bounded Redis cache that is never authoritative for URL resolution."""
 
-    def __init__(self, url: str, ttl_seconds: int) -> None:
+    def __init__(self, url: str, ttl_seconds: int, timeout_seconds: float = 2.0) -> None:
         self.url = url
         self.ttl_seconds = ttl_seconds
+        self.timeout_seconds = timeout_seconds
         self.client: aioredis.Redis | None = None
 
     async def connect(self) -> None:
@@ -142,7 +170,7 @@ class Cache:
                 socket_connect_timeout=0.2,
                 socket_timeout=0.2,
             )
-            await client.ping()
+            await asyncio.wait_for(client.ping(), timeout=self.timeout_seconds)
             self.client = client
         except Exception:
             # Redis is an optimisation.  Keep the service usable through its
@@ -167,7 +195,9 @@ class Cache:
 
     async def ping(self) -> None:
         try:
-            await self._client().ping()
+            if self.client is None:
+                await self.connect()
+            await asyncio.wait_for(self._client().ping(), timeout=self.timeout_seconds)
         except Exception as exc:
             raise CacheUnavailable("cache ping failed") from exc
 
@@ -194,12 +224,23 @@ def create_app(
     """Build the ASGI application without connecting to infrastructure."""
 
     configured = settings or Settings.from_env()
-    store = database or Database(configured.database_url)
-    url_cache = cache or Cache(configured.redis_url, configured.redis_ttl_seconds)
+    store = database or Database(
+        configured.database_url, configured.dependency_timeout_seconds
+    )
+    url_cache = cache or Cache(
+        configured.redis_url,
+        configured.redis_ttl_seconds,
+        configured.dependency_timeout_seconds,
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        await store.connect()
+        try:
+            await store.connect()
+        except DatabaseUnavailable:
+            # The process stays alive; /ready performs bounded reconnect
+            # attempts and keeps it out of Service endpoints until recovery.
+            pass
         await url_cache.connect()
         try:
             yield
