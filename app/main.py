@@ -19,8 +19,22 @@ from urllib.parse import urlsplit
 import asyncpg
 import redis.asyncio as aioredis
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, field_validator
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
+from prometheus_fastapi_instrumentator import Instrumentator
+
+
+CACHE_HITS = Counter("url_shortener_cache_hits_total", "Redis cache hits")
+CACHE_MISSES = Counter(
+    "url_shortener_cache_misses_total", "Redis misses or unavailable cache fallbacks"
+)
+URLS_CREATED = Counter("url_shortener_urls_created_total", "New short URLs created")
+DEPENDENCY_UP = Gauge(
+    "url_shortener_dependency_up",
+    "Whether a backing dependency was reachable at the most recent health check.",
+    ["dependency"],
+)
 
 
 @dataclass(frozen=True)
@@ -259,6 +273,11 @@ def create_app(
     application.state.has_been_ready = False
     create_code = code_generator or (lambda: generate_code(configured.code_length))
 
+    Instrumentator(
+        excluded_handlers=["/livez", "/ready", "/metrics"],
+        should_group_status_codes=False,
+    ).instrument(application)
+
     @application.get("/")
     async def index() -> dict[str, str]:
         return {"service": "url-shortener", "status": "configured"}
@@ -269,6 +288,10 @@ def create_app(
 
         return {"status": "alive"}
 
+    @application.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
     @application.get("/ready")
     async def ready() -> dict[str, str]:
         """Readiness needs Postgres always and Redis only before first success."""
@@ -278,13 +301,17 @@ def create_app(
         except Exception as exc:
             # Keep the original dependency exception out of the response, but
             # never convert it into liveness failure or a 500.
+            DEPENDENCY_UP.labels(dependency="postgres").set(0)
             raise HTTPException(status_code=503, detail="database not ready") from exc
+        DEPENDENCY_UP.labels(dependency="postgres").set(1)
 
         if not application.state.has_been_ready:
             try:
                 await url_cache.ping()
             except Exception as exc:
+                DEPENDENCY_UP.labels(dependency="redis").set(0)
                 raise HTTPException(status_code=503, detail="cache not ready") from exc
+            DEPENDENCY_UP.labels(dependency="redis").set(1)
             application.state.has_been_ready = True
 
         return {"status": "ready"}
@@ -321,6 +348,7 @@ def create_app(
                     request.url,
                 )
                 if created is not None:
+                    URLS_CREATED.inc()
                     return {
                         "code": created["code"],
                         "short_url": f"{configured.base_url}/{created['code']}",
@@ -351,8 +379,11 @@ def create_app(
         try:
             cached_url = await url_cache.get(code)
             if cached_url:
+                CACHE_HITS.inc()
                 return RedirectResponse(url=cached_url, status_code=302)
+            CACHE_MISSES.inc()
         except CacheUnavailable:
+            CACHE_MISSES.inc()
             pass
 
         try:
