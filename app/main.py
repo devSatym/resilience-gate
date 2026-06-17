@@ -150,8 +150,14 @@ class Database:
         return self.pool
 
     async def fetchrow(self, query: str, *args: object) -> asyncpg.Record | None:
-        async with self._pool().acquire() as connection:
-            return await connection.fetchrow(query, *args)
+        try:
+            async with self._pool().acquire() as connection:
+                return await connection.fetchrow(query, *args)
+        except (asyncpg.PostgresError, OSError, asyncio.TimeoutError) as exc:
+            # Drop a poisoned pool so the next bounded readiness attempt builds
+            # a fresh connection rather than repeating a known-bad one.
+            await self.close()
+            raise DatabaseUnavailable("database query failed") from exc
 
     async def ping(self) -> None:
         if self.pool is None:
