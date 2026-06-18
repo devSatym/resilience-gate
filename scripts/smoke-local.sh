@@ -13,7 +13,7 @@ trap cleanup EXIT
 docker compose up --build --detach
 
 for attempt in $(seq 1 30); do
-  if curl --fail --silent --show-error http://localhost:8000/ >/dev/null; then
+  if curl --fail --silent --show-error http://localhost:8000/ready >/dev/null; then
     break
   fi
   if [ "$attempt" -eq 30 ]; then
@@ -32,5 +32,13 @@ redirect_headers=$(curl --silent --show-error --dump-header - --output /dev/null
   "http://localhost:8000/$code")
 printf '%s\n' "$redirect_headers" | grep --quiet --ignore-case \
   '^location: https://example\.test/smoke'
+
+# Redis is an optimisation after initial readiness. Its temporary loss must
+# preserve process liveness and steady-state readiness while URL resolution
+# falls back to Postgres.
+docker compose stop redis
+curl --fail --silent --show-error http://localhost:8000/livez >/dev/null
+curl --fail --silent --show-error http://localhost:8000/ready >/dev/null
+docker compose start redis
 
 echo "local smoke test passed"
