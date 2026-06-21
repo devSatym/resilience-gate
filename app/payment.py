@@ -12,9 +12,15 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
+
 
 class PaymentHeaderError(ValueError):
     """A client-supplied x402 header was not valid base64 JSON."""
+
+
+class FacilitatorUnavailable(RuntimeError):
+    """The facilitator could not be contacted or returned an HTTP failure."""
 
 
 @dataclass(frozen=True)
@@ -73,3 +79,45 @@ def payment_required_descriptor(
         },
         "accepts": [requirements.as_dict()],
     }
+
+
+class FacilitatorClient:
+    """Small injected HTTP client for x402 `/verify` and `/settle` calls."""
+
+    def __init__(self, base_url: str, client: httpx.AsyncClient, timeout_seconds: float = 10.0):
+        self.base_url = base_url.rstrip("/")
+        self.client = client
+        self.timeout_seconds = timeout_seconds
+
+    async def _post(
+        self,
+        endpoint: str,
+        payment_payload: dict[str, Any],
+        requirements: PaymentRequirements,
+    ) -> dict[str, Any]:
+        body = {
+            "x402Version": 2,
+            "paymentPayload": payment_payload,
+            "paymentRequirements": requirements.as_dict(),
+        }
+        try:
+            response = await self.client.post(
+                f"{self.base_url}{endpoint}", json=body, timeout=self.timeout_seconds
+            )
+            response.raise_for_status()
+            parsed = response.json()
+        except (httpx.HTTPError, json.JSONDecodeError) as exc:
+            raise FacilitatorUnavailable(f"facilitator {endpoint} unavailable") from exc
+        if not isinstance(parsed, dict):
+            raise FacilitatorUnavailable(f"facilitator {endpoint} returned a non-object response")
+        return parsed
+
+    async def verify(
+        self, payment_payload: dict[str, Any], requirements: PaymentRequirements
+    ) -> dict[str, Any]:
+        return await self._post("/verify", payment_payload, requirements)
+
+    async def settle(
+        self, payment_payload: dict[str, Any], requirements: PaymentRequirements
+    ) -> dict[str, Any]:
+        return await self._post("/settle", payment_payload, requirements)
