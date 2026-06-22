@@ -9,7 +9,9 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import re
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 import httpx
@@ -21,6 +23,23 @@ class PaymentHeaderError(ValueError):
 
 class FacilitatorUnavailable(RuntimeError):
     """The facilitator could not be contacted or returned an HTTP failure."""
+
+
+class SettlementStatus(StrEnum):
+    SETTLED = "settled"
+    SIGNATURE_INVALID = "signature_invalid"
+    VERIFY_REJECTED = "verify_rejected"
+    SETTLE_REJECTED = "settle_rejected"
+    INVALID_RESPONSE = "invalid_response"
+    FACILITATOR_UNAVAILABLE = "facilitator_unavailable"
+
+
+@dataclass(frozen=True)
+class SettlementResult:
+    status: SettlementStatus
+    message: str
+    transaction_hash: str = ""
+    payer: str = ""
 
 
 @dataclass(frozen=True)
@@ -79,6 +98,74 @@ def payment_required_descriptor(
         },
         "accepts": [requirements.as_dict()],
     }
+
+
+_TRANSACTION_HASH = re.compile(r"^0x[a-fA-F0-9]{64}$")
+_ADDRESS = re.compile(r"^0x[a-fA-F0-9]{40}$")
+
+
+def validate_verify_response(response: dict[str, Any]) -> SettlementResult | None:
+    """Return a terminal rejection for invalid `/verify` output, if any."""
+
+    verdict = response.get("isValid")
+    if verdict is True:
+        return None
+    if verdict is not False:
+        return SettlementResult(
+            SettlementStatus.INVALID_RESPONSE,
+            "facilitator verify response has no boolean isValid field",
+        )
+    reason = response.get("invalidReason") or response.get("invalidMessage") or "verify rejected"
+    if not isinstance(reason, str):
+        return SettlementResult(
+            SettlementStatus.INVALID_RESPONSE,
+            "facilitator verify rejection reason is not text",
+        )
+    status = (
+        SettlementStatus.SIGNATURE_INVALID
+        if "signature" in reason.lower()
+        else SettlementStatus.VERIFY_REJECTED
+    )
+    try:
+        payer = _validated_payer(response.get("payer"))
+    except ValueError as exc:
+        return SettlementResult(SettlementStatus.INVALID_RESPONSE, str(exc))
+    return SettlementResult(status, reason, payer=payer)
+
+
+def _validated_payer(value: object) -> str:
+    if value in (None, ""):
+        return ""
+    if not isinstance(value, str) or not _ADDRESS.fullmatch(value):
+        raise ValueError("facilitator payer must be a 20-byte hex address")
+    return value
+
+
+def validate_settle_response(response: dict[str, Any]) -> SettlementResult:
+    """Validate a `/settle` result before it can be persisted or returned."""
+
+    success = response.get("success")
+    if success is not True:
+        if success is False:
+            reason = response.get("errorReason") or response.get("errorMessage") or "settle rejected"
+            if isinstance(reason, str):
+                return SettlementResult(SettlementStatus.SETTLE_REJECTED, reason)
+        return SettlementResult(
+            SettlementStatus.INVALID_RESPONSE,
+            "facilitator settle response has no valid success field",
+        )
+
+    transaction = response.get("transaction")
+    if not isinstance(transaction, str) or not _TRANSACTION_HASH.fullmatch(transaction):
+        return SettlementResult(
+            SettlementStatus.INVALID_RESPONSE,
+            "facilitator settlement transaction is not a 32-byte hash",
+        )
+    try:
+        payer = _validated_payer(response.get("payer"))
+    except ValueError as exc:
+        return SettlementResult(SettlementStatus.INVALID_RESPONSE, str(exc))
+    return SettlementResult(SettlementStatus.SETTLED, "payment settled", transaction, payer)
 
 
 class FacilitatorClient:

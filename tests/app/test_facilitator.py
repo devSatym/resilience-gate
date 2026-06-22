@@ -6,7 +6,13 @@ import httpx
 import pytest
 import respx
 
-from app.payment import FacilitatorClient, PaymentRequirements
+from app.payment import (
+    FacilitatorClient,
+    PaymentRequirements,
+    SettlementStatus,
+    validate_settle_response,
+    validate_verify_response,
+)
 
 
 @pytest.fixture
@@ -42,3 +48,19 @@ async def test_verify_and_settle_send_the_same_signed_payload(
     settle_body = json.loads(settle.calls[0].request.content)
     assert verify_body["paymentPayload"] == payload
     assert settle_body["paymentRequirements"]["network"] == "eip155:72344"
+
+
+def test_invalid_or_incomplete_upstream_responses_cannot_be_treated_as_success() -> None:
+    assert validate_verify_response({"isValid": "yes"}).status == SettlementStatus.INVALID_RESPONSE
+    assert validate_verify_response(
+        {"isValid": False, "invalidReason": "bad signature"}
+    ).status == SettlementStatus.SIGNATURE_INVALID
+    assert validate_verify_response(
+        {"isValid": False, "invalidReason": "bad signature", "payer": "bad"}
+    ).status == SettlementStatus.INVALID_RESPONSE
+    assert validate_settle_response({"success": True, "transaction": "0xnot-a-hash"}).status == (
+        SettlementStatus.INVALID_RESPONSE
+    )
+    assert validate_settle_response({"success": False, "errorMessage": "denied"}).status == (
+        SettlementStatus.SETTLE_REJECTED
+    )
