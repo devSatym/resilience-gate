@@ -13,16 +13,27 @@ import string
 import asyncio
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
 import asyncpg
+import httpx
 import redis.asyncio as aioredis
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, field_validator
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
+
+from app.payment import (
+    FacilitatorClient,
+    PaymentRequirements,
+    SettlementResult,
+    SettlementStatus,
+    encode_header,
+    payment_required_descriptor,
+    settle_payment,
+)
 
 
 CACHE_HITS = Counter("url_shortener_cache_hits_total", "Redis cache hits")
@@ -47,6 +58,12 @@ class Settings:
     redis_url: str
     redis_ttl_seconds: int = 3600
     dependency_timeout_seconds: float = 2.0
+    facilitator_url: str = ""
+    service_wallet: str = ""
+    asset_contract: str = ""
+    payment_amount: str = "1000"
+    payment_network: str = "eip155:72344"
+    payment_timeout_seconds: float = 10.0
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -66,6 +83,28 @@ class Settings:
             dependency_timeout_seconds=float(
                 os.getenv("DEPENDENCY_TIMEOUT_SECONDS", "2")
             ),
+            facilitator_url=os.getenv("FACILITATOR_URL", "").strip().rstrip("/"),
+            service_wallet=os.getenv("SERVICE_WALLET_ADDRESS", "").strip(),
+            asset_contract=os.getenv("SBC_CONTRACT_ADDRESS", "").strip(),
+            payment_amount=os.getenv("SHORTEN_FEE", "1000").strip(),
+            payment_network=os.getenv("NETWORK_CAIP2", "eip155:72344").strip(),
+            payment_timeout_seconds=float(os.getenv("FACILITATOR_TIMEOUT_SECONDS", "10")),
+        )
+
+    @property
+    def payment_enabled(self) -> bool:
+        return bool(self.facilitator_url and self.service_wallet and self.asset_contract)
+
+    def payment_requirements(self) -> PaymentRequirements:
+        if not self.payment_enabled:
+            raise ValueError("payment configuration is incomplete")
+        return PaymentRequirements(
+            scheme="exact",
+            network=self.payment_network,
+            amount=self.payment_amount,
+            asset=self.asset_contract,
+            pay_to=self.service_wallet,
+            max_timeout_seconds=300,
         )
 
 
@@ -240,6 +279,7 @@ def create_app(
     database: Database | None = None,
     cache: Cache | None = None,
     code_generator: Callable[[], str] | None = None,
+    payment_processor: Callable[[str], Awaitable[SettlementResult]] | None = None,
 ) -> FastAPI:
     """Build the ASGI application without connecting to infrastructure."""
 
@@ -255,6 +295,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        nonlocal payment_client
         try:
             await store.connect()
         except DatabaseUnavailable:
@@ -262,9 +303,14 @@ def create_app(
             # attempts and keeps it out of Service endpoints until recovery.
             pass
         await url_cache.connect()
+        if configured.payment_enabled and payment_processor is None:
+            payment_client = httpx.AsyncClient()
         try:
             yield
         finally:
+            if payment_client is not None:
+                await payment_client.aclose()
+                payment_client = None
             await url_cache.close()
             await store.close()
 
@@ -278,6 +324,25 @@ def create_app(
     application.state.cache = url_cache
     application.state.has_been_ready = False
     create_code = code_generator or (lambda: generate_code(configured.code_length))
+    payment_client: httpx.AsyncClient | None = None
+
+    async def process_payment(header_value: str) -> SettlementResult:
+        if payment_processor is not None:
+            return await payment_processor(header_value)
+        if payment_client is None:
+            return SettlementResult(
+                SettlementStatus.FACILITATOR_UNAVAILABLE,
+                "payment client is not initialised",
+            )
+        return await settle_payment(
+            header_value,
+            FacilitatorClient(
+                configured.facilitator_url,
+                payment_client,
+                configured.payment_timeout_seconds,
+            ),
+            configured.payment_requirements(),
+        )
 
     Instrumentator(
         excluded_handlers=["/livez", "/ready", "/metrics"],
@@ -323,22 +388,43 @@ def create_app(
         return {"status": "ready"}
 
     @application.post("/shorten", status_code=201)
-    async def shorten(request: ShortenRequest):
+    async def shorten(
+        body: ShortenRequest,
+        request: Request,
+        payment_signature: str | None = Header(default=None, alias="PAYMENT-SIGNATURE"),
+    ):
         """Create one short code per destination URL, reusing an existing one."""
 
         try:
             existing = await store.fetchrow(
-                "SELECT code FROM urls WHERE url = $1", request.url
+                "SELECT code FROM urls WHERE url = $1", body.url
             )
             if existing is not None:
                 return JSONResponse(
                     {
                         "code": existing["code"],
                         "short_url": f"{configured.base_url}/{existing['code']}",
-                        "original_url": request.url,
+                        "original_url": body.url,
                     },
                     status_code=200,
                 )
+
+            if configured.payment_enabled:
+                if not payment_signature:
+                    descriptor = payment_required_descriptor(
+                        str(request.url), configured.payment_requirements()
+                    )
+                    return Response(
+                        content="{}",
+                        status_code=402,
+                        media_type="application/json",
+                        headers={"PAYMENT-REQUIRED": encode_header(descriptor)},
+                    )
+                payment_result = await process_payment(payment_signature)
+                if payment_result.status == SettlementStatus.FACILITATOR_UNAVAILABLE:
+                    raise HTTPException(status_code=503, detail="payment facilitator unavailable")
+                if payment_result.status != SettlementStatus.SETTLED:
+                    raise HTTPException(status_code=402, detail="payment was not accepted")
 
             # A collision is extremely unlikely, but each insertion is still
             # conflict-safe and the URL is re-read before returning failure.
@@ -351,25 +437,25 @@ def create_app(
                     RETURNING code
                     """,
                     code,
-                    request.url,
+                    body.url,
                 )
                 if created is not None:
                     URLS_CREATED.inc()
                     return {
                         "code": created["code"],
                         "short_url": f"{configured.base_url}/{created['code']}",
-                        "original_url": request.url,
+                        "original_url": body.url,
                     }
 
                 existing = await store.fetchrow(
-                    "SELECT code FROM urls WHERE url = $1", request.url
+                    "SELECT code FROM urls WHERE url = $1", body.url
                 )
                 if existing is not None:
                     return JSONResponse(
                         {
                             "code": existing["code"],
                             "short_url": f"{configured.base_url}/{existing['code']}",
-                            "original_url": request.url,
+                            "original_url": body.url,
                         },
                         status_code=200,
                     )

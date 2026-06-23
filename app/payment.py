@@ -208,3 +208,25 @@ class FacilitatorClient:
         self, payment_payload: dict[str, Any], requirements: PaymentRequirements
     ) -> dict[str, Any]:
         return await self._post("/settle", payment_payload, requirements)
+
+
+async def settle_payment(
+    header_value: str,
+    facilitator: FacilitatorClient,
+    requirements: PaymentRequirements,
+) -> SettlementResult:
+    """Decode, verify, and settle one client payment without trusting its terms."""
+
+    try:
+        payload = decode_header(header_value)
+    except PaymentHeaderError as exc:
+        return SettlementResult(SettlementStatus.INVALID_RESPONSE, str(exc))
+    try:
+        verification = await facilitator.verify(payload, requirements)
+        rejected = validate_verify_response(verification)
+        if rejected is not None:
+            return rejected
+        settlement = await facilitator.settle(payload, requirements)
+        return validate_settle_response(settlement)
+    except FacilitatorUnavailable as exc:
+        return SettlementResult(SettlementStatus.FACILITATOR_UNAVAILABLE, str(exc))
