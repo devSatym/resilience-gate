@@ -135,6 +135,15 @@ CREATE TABLE IF NOT EXISTS urls (
     url TEXT NOT NULL UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE urls
+    ADD COLUMN IF NOT EXISTS settlement_tx_hash VARCHAR(66),
+    ADD COLUMN IF NOT EXISTS payer_address VARCHAR(42),
+    ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS urls_settlement_tx_hash_unique
+    ON urls (settlement_tx_hash)
+    WHERE settlement_tx_hash IS NOT NULL;
 """
 
 
@@ -395,6 +404,7 @@ def create_app(
     ):
         """Create one short code per destination URL, reusing an existing one."""
 
+        payment_result: SettlementResult | None = None
         try:
             existing = await store.fetchrow(
                 "SELECT code FROM urls WHERE url = $1", body.url
@@ -430,15 +440,30 @@ def create_app(
             # conflict-safe and the URL is re-read before returning failure.
             for _ in range(3):
                 code = create_code()
-                created = await store.fetchrow(
-                    """
-                    INSERT INTO urls (code, url) VALUES ($1, $2)
-                    ON CONFLICT DO NOTHING
-                    RETURNING code
-                    """,
-                    code,
-                    body.url,
-                )
+                if payment_result is None:
+                    created = await store.fetchrow(
+                        """
+                        INSERT INTO urls (code, url) VALUES ($1, $2)
+                        ON CONFLICT DO NOTHING
+                        RETURNING code
+                        """,
+                        code,
+                        body.url,
+                    )
+                else:
+                    created = await store.fetchrow(
+                        """
+                        INSERT INTO urls (
+                            code, url, settlement_tx_hash, payer_address, settled_at
+                        ) VALUES ($1, $2, $3, $4, NOW())
+                        ON CONFLICT DO NOTHING
+                        RETURNING code
+                        """,
+                        code,
+                        body.url,
+                        payment_result.transaction_hash,
+                        payment_result.payer or None,
+                    )
                 if created is not None:
                     URLS_CREATED.inc()
                     return {
@@ -459,6 +484,17 @@ def create_app(
                         },
                         status_code=200,
                     )
+
+                if payment_result is not None:
+                    replay = await store.fetchrow(
+                        "SELECT code FROM urls WHERE settlement_tx_hash = $1",
+                        payment_result.transaction_hash,
+                    )
+                    if replay is not None:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="payment settlement has already been used",
+                        )
         except DatabaseUnavailable as exc:
             raise HTTPException(status_code=503, detail="database unavailable") from exc
 
