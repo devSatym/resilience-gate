@@ -10,11 +10,25 @@ import base64
 import binascii
 import json
 import re
+import time
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
 import httpx
+from prometheus_client import Counter, Histogram
+
+
+FACILITATOR_CALLS = Counter(
+    "url_shortener_facilitator_calls_total",
+    "Facilitator calls grouped by endpoint and outcome.",
+    ["endpoint", "outcome"],
+)
+FACILITATOR_LATENCY = Histogram(
+    "url_shortener_facilitator_request_duration_seconds",
+    "Elapsed time for a facilitator request.",
+    ["endpoint"],
+)
 
 
 class PaymentHeaderError(ValueError):
@@ -187,17 +201,30 @@ class FacilitatorClient:
             "paymentPayload": payment_payload,
             "paymentRequirements": requirements.as_dict(),
         }
+        endpoint_label = endpoint.removeprefix("/")
+        outcome = "success"
+        started = time.perf_counter()
         try:
-            response = await self.client.post(
-                f"{self.base_url}{endpoint}", json=body, timeout=self.timeout_seconds
+            try:
+                response = await self.client.post(
+                    f"{self.base_url}{endpoint}", json=body, timeout=self.timeout_seconds
+                )
+                response.raise_for_status()
+                parsed = response.json()
+            except (httpx.HTTPError, json.JSONDecodeError) as exc:
+                outcome = "unavailable"
+                raise FacilitatorUnavailable(f"facilitator {endpoint} unavailable") from exc
+            if not isinstance(parsed, dict):
+                outcome = "invalid_response"
+                raise FacilitatorUnavailable(
+                    f"facilitator {endpoint} returned a non-object response"
+                )
+            return parsed
+        finally:
+            FACILITATOR_CALLS.labels(endpoint=endpoint_label, outcome=outcome).inc()
+            FACILITATOR_LATENCY.labels(endpoint=endpoint_label).observe(
+                time.perf_counter() - started
             )
-            response.raise_for_status()
-            parsed = response.json()
-        except (httpx.HTTPError, json.JSONDecodeError) as exc:
-            raise FacilitatorUnavailable(f"facilitator {endpoint} unavailable") from exc
-        if not isinstance(parsed, dict):
-            raise FacilitatorUnavailable(f"facilitator {endpoint} returned a non-object response")
-        return parsed
 
     async def verify(
         self, payment_payload: dict[str, Any], requirements: PaymentRequirements

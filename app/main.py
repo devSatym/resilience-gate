@@ -41,6 +41,15 @@ CACHE_MISSES = Counter(
     "url_shortener_cache_misses_total", "Redis misses or unavailable cache fallbacks"
 )
 URLS_CREATED = Counter("url_shortener_urls_created_total", "New short URLs created")
+PAYMENT_OUTCOMES = Counter(
+    "url_shortener_payment_outcomes_total",
+    "Payment decisions grouped by their fail-closed outcome.",
+    ["outcome"],
+)
+PAYMENT_REPLAYS = Counter(
+    "url_shortener_payment_replays_total",
+    "Settlement transactions rejected because they were already used.",
+)
 DEPENDENCY_UP = Gauge(
     "url_shortener_dependency_up",
     "Whether a backing dependency was reachable at the most recent health check.",
@@ -421,6 +430,7 @@ def create_app(
 
             if configured.payment_enabled:
                 if not payment_signature:
+                    PAYMENT_OUTCOMES.labels(outcome="required").inc()
                     descriptor = payment_required_descriptor(
                         str(request.url), configured.payment_requirements()
                     )
@@ -431,6 +441,7 @@ def create_app(
                         headers={"PAYMENT-REQUIRED": encode_header(descriptor)},
                     )
                 payment_result = await process_payment(payment_signature)
+                PAYMENT_OUTCOMES.labels(outcome=payment_result.status.value).inc()
                 if payment_result.status == SettlementStatus.FACILITATOR_UNAVAILABLE:
                     raise HTTPException(status_code=503, detail="payment facilitator unavailable")
                 if payment_result.status != SettlementStatus.SETTLED:
@@ -491,6 +502,7 @@ def create_app(
                         payment_result.transaction_hash,
                     )
                     if replay is not None:
+                        PAYMENT_REPLAYS.inc()
                         raise HTTPException(
                             status_code=409,
                             detail="payment settlement has already been used",
