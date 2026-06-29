@@ -1,0 +1,12 @@
+# Direct runtime dependencies for the Permit2 signer.
+#
+# Keep this file deliberately small: every runtime import in signer/ belongs
+# here.  requirements.lock pins the complete Linux/Python 3.12 resolution used
+# by containers and CI; update these direct pins first, then regenerate the
+# lock in a clean environment and review the resolved dependency changes.
+eth-account==0.14.0
+fastapi==0.142.2
+prometheus-client==0.26.0
+prometheus-fastapi-instrumentator==8.1.0
+uvicorn[standard]==0.54.0
+web3==8.0.0
