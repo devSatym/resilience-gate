@@ -1,0 +1,43 @@
+# Opt-in testnet payment overlay. It is never loaded by the default local
+# Compose stack, so local API work needs neither wallet keys nor internet RPC.
+#
+# Usage:
+#   cp signer/.env.example signer/.env
+#   # fill testnet values, then:
+#   docker compose --env-file signer/.env -f docker-compose.yml \
+#     -f docker-compose.payments.yml --profile payments up --build
+
+services:
+  app:
+    environment:
+      FACILITATOR_URL: ${FACILITATOR_URL:?set FACILITATOR_URL in signer/.env}
+      SERVICE_WALLET_ADDRESS: ${SERVICE_WALLET_ADDRESS:?set SERVICE_WALLET_ADDRESS in signer/.env}
+      SBC_CONTRACT_ADDRESS: ${SBC_CONTRACT_ADDRESS:?set SBC_CONTRACT_ADDRESS in signer/.env}
+      SHORTEN_FEE: ${SBC_AMOUNT:-1000}
+      NETWORK_CAIP2: ${NETWORK_CAIP2:-eip155:72344}
+      FACILITATOR_TIMEOUT_SECONDS: ${FACILITATOR_TIMEOUT_SECONDS:-10}
+
+  signer:
+    profiles: ["payments"]
+    build:
+      context: ./signer
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      RPC_URL: ${RPC_URL:?set RPC_URL in signer/.env}
+      CHAIN_ID: ${CHAIN_ID:-72344}
+      NETWORK_CAIP2: ${NETWORK_CAIP2:-eip155:72344}
+      SERVICE_WALLET_ADDRESS: ${SERVICE_WALLET_ADDRESS:?set SERVICE_WALLET_ADDRESS in signer/.env}
+      SBC_CONTRACT_ADDRESS: ${SBC_CONTRACT_ADDRESS:?set SBC_CONTRACT_ADDRESS in signer/.env}
+      PERMIT2_CONTRACT_ADDRESS: ${PERMIT2_CONTRACT_ADDRESS:-0x000000000022D473030F116dDEE9F6B43aC78BA3}
+      X402_PROXY_ADDRESS: ${X402_PROXY_ADDRESS:-0x402085c248EeA27D92E8b30b2C58ed07f9E20001}
+      WALLET_KEY_1: ${WALLET_KEY_1:?set WALLET_KEY_1 in signer/.env}
+      WALLET_KEY_2: ${WALLET_KEY_2:-}
+      WALLET_KEY_3: ${WALLET_KEY_3:-}
+      SBC_AMOUNT: ${SBC_AMOUNT:-1000}
+      DEADLINE_SECONDS: ${DEADLINE_SECONDS:-300}
+      MAX_DEADLINE_SECONDS: ${MAX_DEADLINE_SECONDS:-300}
+      RPC_TIMEOUT_SECONDS: ${RPC_TIMEOUT_SECONDS:-10}
+      APPROVAL_TX_TIMEOUT_SECONDS: ${APPROVAL_TX_TIMEOUT_SECONDS:-60}
+    restart: "no"

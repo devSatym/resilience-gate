@@ -1,0 +1,10 @@
+# A signer image must never accidentally contain developer credentials or test
+# artifacts. The runtime COPY list in the Dockerfile is intentionally narrow.
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+test_*.py
+README.md
