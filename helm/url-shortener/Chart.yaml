@@ -1,0 +1,18 @@
+apiVersion: v2
+name: url-shortener
+description: Resilience Gate's testnet-only URL shortener workload with Redis, PostgreSQL, and x402 payment verification.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+annotations:
+  resilience-gate.io/scope: testnet-only
+dependencies:
+  - name: redis
+    version: "25.3.5"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: postgresql
+    version: "18.5.7"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
