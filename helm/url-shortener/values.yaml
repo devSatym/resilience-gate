@@ -1,0 +1,9 @@
+# Naming and workload identity (C030).
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automount: false
