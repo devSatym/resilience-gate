@@ -7,3 +7,63 @@ serviceAccount:
   name: ""
   annotations: {}
   automount: false
+
+# Application service and non-secret configuration (C031).
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: http
+
+app:
+  baseUrl: "http://localhost:8000"
+  codeLength: "8"
+  redisTtlSeconds: "3600"
+  dependencyTimeoutSeconds: "2"
+
+# The chart accepts payments only when the environment selects its testnet
+# configuration. The merchant address is intentionally supplied outside Git.
+payments:
+  enabled: false
+  testnetOnly: true
+  allowedNetworks:
+    - "eip155:72344"
+  facilitatorUrl: "https://facilitator.testnet.radiustech.xyz"
+  network: "eip155:72344"
+  assetContract: "0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb"
+  amount: "1000"
+  timeoutSeconds: "10"
+  localServiceWalletAddress: ""
+
+postgresql:
+  enabled: true
+  auth:
+    username: urlshortener
+    database: urlshortener
+    password: ""
+    existingSecret: ""
+    secretKeys:
+      adminPasswordKey: postgres-password
+      userPasswordKey: password
+  primary:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    password: ""
+    existingSecret: ""
+    existingSecretPasswordKey: redis-password
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# C035 expands this into a provider-backed secret reference.
+externalSecrets:
+  enabled: false
+  target:
+    name: ""

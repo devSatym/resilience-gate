@@ -1,0 +1,35 @@
+{{- if .Values.payments.enabled }}
+{{- if not .Values.payments.testnetOnly }}
+{{- fail "payments.testnetOnly must remain true in this chart" }}
+{{- end }}
+{{- if not (has .Values.payments.network .Values.payments.allowedNetworks) }}
+{{- fail "payments.network is not in payments.allowedNetworks; only approved testnets are allowed" }}
+{{- end }}
+{{- if not (contains "testnet" .Values.payments.facilitatorUrl) }}
+{{- fail "payments.facilitatorUrl must explicitly identify a testnet endpoint" }}
+{{- end }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "url-shortener.fullname" . }}-config
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+data:
+  BASE_URL: {{ .Values.app.baseUrl | quote }}
+  CODE_LENGTH: {{ .Values.app.codeLength | quote }}
+  REDIS_TTL_SECONDS: {{ .Values.app.redisTtlSeconds | quote }}
+  DEPENDENCY_TIMEOUT_SECONDS: {{ .Values.app.dependencyTimeoutSeconds | quote }}
+  {{- if .Values.payments.enabled }}
+  SBC_CONTRACT_ADDRESS: {{ required "payments.assetContract is required when payments are enabled" .Values.payments.assetContract | quote }}
+  SHORTEN_FEE: {{ required "payments.amount is required when payments are enabled" .Values.payments.amount | quote }}
+  FACILITATOR_URL: {{ required "payments.facilitatorUrl is required when payments are enabled" .Values.payments.facilitatorUrl | quote }}
+  NETWORK_CAIP2: {{ required "payments.network is required when payments are enabled" .Values.payments.network | quote }}
+  FACILITATOR_TIMEOUT_SECONDS: {{ .Values.payments.timeoutSeconds | quote }}
+  {{- else }}
+  SBC_CONTRACT_ADDRESS: ""
+  SHORTEN_FEE: ""
+  FACILITATOR_URL: ""
+  NETWORK_CAIP2: ""
+  FACILITATOR_TIMEOUT_SECONDS: "10"
+  {{- end }}
