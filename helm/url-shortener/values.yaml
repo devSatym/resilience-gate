@@ -20,8 +20,6 @@ app:
   redisTtlSeconds: "3600"
   dependencyTimeoutSeconds: "2"
 
-# The chart accepts payments only when the environment selects its testnet
-# configuration. The merchant address is intentionally supplied outside Git.
 payments:
   enabled: false
   testnetOnly: true
@@ -62,7 +60,57 @@ redis:
       enabled: true
       size: 1Gi
 
-# C035 expands this into a provider-backed secret reference.
+# Immutable image and hardened workload defaults (C032).
+image:
+  repository: registry.example.invalid/resilience-gate/url-shortener
+  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+replicaCount: 1
+terminationGracePeriodSeconds: 30
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+
+probes:
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 6
+  startup:
+    periodSeconds: 2
+    timeoutSeconds: 2
+    failureThreshold: 30
+
+metrics:
+  enabled: true
+  port: "8000"
+  path: "/metrics"
+
 externalSecrets:
   enabled: false
   target:
