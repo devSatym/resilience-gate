@@ -70,6 +70,18 @@ imagePullSecrets: []
 replicaCount: 1
 terminationGracePeriodSeconds: 30
 
+# Availability controls (C033).
+placement:
+  podAntiAffinity:
+    enabled: false
+  topologySpread:
+    enabled: false
+    maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
 resources:
   requests:
     cpu: 50m

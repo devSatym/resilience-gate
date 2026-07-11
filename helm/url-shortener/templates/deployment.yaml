@@ -41,6 +41,26 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.placement.podAntiAffinity.enabled }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "url-shortener.selectorLabels" . | nindent 20 }}
+                topologyKey: {{ .Values.placement.topologySpread.topologyKey | quote }}
+      {{- end }}
+      {{- if .Values.placement.topologySpread.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.placement.topologySpread.maxSkew }}
+          topologyKey: {{ .Values.placement.topologySpread.topologyKey | quote }}
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "url-shortener.selectorLabels" . | nindent 14 }}
+      {{- end }}
       containers:
         - name: url-shortener
           image: {{ include "url-shortener.image" . | quote }}
