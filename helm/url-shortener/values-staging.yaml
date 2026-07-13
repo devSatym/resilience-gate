@@ -1,0 +1,52 @@
+# Staging exercises the normal high-availability profile on the owned testnet.
+image:
+  repository: registry.example.invalid/resilience-gate/url-shortener
+  digest: "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+
+replicaCount: 2
+
+placement:
+  podAntiAffinity:
+    enabled: true
+  topologySpread:
+    enabled: true
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+app:
+  baseUrl: "http://url-shortener-staging.url-shortener-staging.svc.cluster.local"
+
+payments:
+  enabled: true
+  testnetOnly: true
+  facilitatorUrl: "https://facilitator.testnet.radiustech.xyz"
+  network: "eip155:72344"
+  timeoutSeconds: "10"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+postgresql:
+  auth:
+    existingSecret: url-shortener-staging-credentials
+
+redis:
+  auth:
+    existingSecret: url-shortener-staging-credentials
+
+externalSecrets:
+  enabled: true
+  target:
+    name: url-shortener-staging-credentials
+  remoteRefs:
+    databaseUrlKey: resilience-gate/staging/url-shortener-database-url
+    databasePasswordKey: resilience-gate/staging/url-shortener-database-password
+    redisUrlKey: resilience-gate/staging/url-shortener-redis-url
+    redisPasswordKey: resilience-gate/staging/url-shortener-redis-password
+    serviceWalletAddressKey: resilience-gate/staging/service-wallet-address-testnet

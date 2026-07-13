@@ -1,0 +1,57 @@
+# "prod" is a production-like resilience environment on an owned testnet. It
+# must never be converted into a live-network profile.
+image:
+  repository: registry.example.invalid/resilience-gate/url-shortener
+  digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+
+replicaCount: 3
+
+placement:
+  podAntiAffinity:
+    enabled: true
+  topologySpread:
+    enabled: true
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+app:
+  baseUrl: "http://url-shortener-prod.url-shortener-prod.svc.cluster.local"
+
+payments:
+  enabled: true
+  testnetOnly: true
+  facilitatorUrl: "https://facilitator.testnet.radiustech.xyz"
+  network: "eip155:72344"
+  timeoutSeconds: "10"
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+postgresql:
+  auth:
+    existingSecret: url-shortener-prod-credentials
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+redis:
+  auth:
+    existingSecret: url-shortener-prod-credentials
+
+externalSecrets:
+  enabled: true
+  target:
+    name: url-shortener-prod-credentials
+  remoteRefs:
+    databaseUrlKey: resilience-gate/prod/url-shortener-database-url
+    databasePasswordKey: resilience-gate/prod/url-shortener-database-password
+    redisUrlKey: resilience-gate/prod/url-shortener-redis-url
+    redisPasswordKey: resilience-gate/prod/url-shortener-redis-password
+    serviceWalletAddressKey: resilience-gate/prod/service-wallet-address-testnet

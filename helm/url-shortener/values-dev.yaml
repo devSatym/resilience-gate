@@ -1,0 +1,53 @@
+# Development stays on the same testnet-only payment profile as every other
+# environment. The immutable image is a non-routable example until C049 renders
+# approved project-specific configuration.
+image:
+  repository: registry.example.invalid/resilience-gate/url-shortener
+  digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+
+replicaCount: 1
+
+# One replica means no voluntary-disruption guarantee applies in development.
+placement:
+  podAntiAffinity:
+    enabled: false
+  topologySpread:
+    enabled: false
+podDisruptionBudget:
+  enabled: false
+
+app:
+  baseUrl: "http://url-shortener-dev.url-shortener-dev.svc.cluster.local"
+
+payments:
+  enabled: true
+  testnetOnly: true
+  facilitatorUrl: "https://facilitator.testnet.radiustech.xyz"
+  network: "eip155:72344"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+postgresql:
+  auth:
+    existingSecret: url-shortener-dev-credentials
+
+redis:
+  auth:
+    existingSecret: url-shortener-dev-credentials
+
+externalSecrets:
+  enabled: true
+  target:
+    name: url-shortener-dev-credentials
+  remoteRefs:
+    databaseUrlKey: resilience-gate/dev/url-shortener-database-url
+    databasePasswordKey: resilience-gate/dev/url-shortener-database-password
+    redisUrlKey: resilience-gate/dev/url-shortener-redis-url
+    redisPasswordKey: resilience-gate/dev/url-shortener-redis-password
+    serviceWalletAddressKey: resilience-gate/dev/service-wallet-address-testnet
