@@ -24,7 +24,11 @@ spec:
         app: {{ include "url-shortener.name" . }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.externalSecrets.enabled }}
+        checksum/external-secret: {{ include (print $.Template.BasePath "/externalsecret.yaml") . | sha256sum }}
+        {{- else }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
         {{- if .Values.metrics.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/port: {{ .Values.metrics.port | quote }}

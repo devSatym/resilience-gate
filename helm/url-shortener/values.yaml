@@ -20,6 +20,9 @@ app:
   redisTtlSeconds: "3600"
   dependencyTimeoutSeconds: "2"
 
+# This chart intentionally accepts only an explicit testnet configuration.
+# `localServiceWalletAddress` is used solely by the local, non-ESO render and
+# must be supplied at install time; never place a wallet address in values.
 payments:
   enabled: false
   testnetOnly: true
@@ -37,7 +40,8 @@ postgresql:
   auth:
     username: urlshortener
     database: urlshortener
-    password: ""
+    # Empty for the local chart path. Environment overlays point this at the
+    # ExternalSecret target shared by the application and PostgreSQL subchart.
     existingSecret: ""
     secretKeys:
       adminPasswordKey: postgres-password
@@ -52,7 +56,8 @@ redis:
   architecture: standalone
   auth:
     enabled: true
-    password: ""
+    # Empty for the local chart path. Environment overlays point this at the
+    # same ExternalSecret target used by the application and PostgreSQL chart.
     existingSecret: ""
     existingSecretPasswordKey: redis-password
   master:
@@ -60,27 +65,14 @@ redis:
       enabled: true
       size: 1Gi
 
-# Immutable image and hardened workload defaults (C032).
+# Immutable image and hardened pod defaults (C032). The non-routable default
+# is deliberately safe; the approved delivery pipeline writes a real registry
+# and digest to the tracked environment values before deployment.
 image:
   repository: registry.example.invalid/resilience-gate/url-shortener
   digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
   pullPolicy: IfNotPresent
 imagePullSecrets: []
-
-replicaCount: 1
-terminationGracePeriodSeconds: 30
-
-# Availability controls (C033).
-placement:
-  podAntiAffinity:
-    enabled: false
-  topologySpread:
-    enabled: false
-    maxSkew: 1
-    topologyKey: kubernetes.io/hostname
-podDisruptionBudget:
-  enabled: false
-  minAvailable: 1
 
 resources:
   requests:
@@ -118,12 +110,41 @@ probes:
     timeoutSeconds: 2
     failureThreshold: 30
 
+# Availability controls (C033).
+replicaCount: 1
+terminationGracePeriodSeconds: 30
+placement:
+  podAntiAffinity:
+    enabled: false
+  topologySpread:
+    enabled: false
+    maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
 metrics:
   enabled: true
   port: "8000"
   path: "/metrics"
 
+# External Secret references (C035). These are references only; no secret
+# values belong in this repository. The URL references are already URI-encoded
+# connection strings for the application; password references are consumed by
+# the PostgreSQL and Redis dependency charts.
 externalSecrets:
   enabled: false
+  refreshInterval: 1h
+  secretStore:
+    name: resilience-gate-secrets
+    kind: ClusterSecretStore
   target:
     name: ""
+    creationPolicy: Owner
+  remoteRefs:
+    databaseUrlKey: resilience-gate/shared/url-shortener-database-url
+    databasePasswordKey: resilience-gate/shared/url-shortener-database-password
+    redisUrlKey: resilience-gate/shared/url-shortener-redis-url
+    redisPasswordKey: resilience-gate/shared/url-shortener-redis-password
+    serviceWalletAddressKey: resilience-gate/shared/service-wallet-address-testnet
