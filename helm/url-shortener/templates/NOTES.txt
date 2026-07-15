@@ -1,0 +1,19 @@
+Resilience Gate URL Shortener deployed to namespace: {{ .Release.Namespace }}
+
+  Release:  {{ .Release.Name }}
+  Image:    {{ include "url-shortener.image" . }}
+  Replicas: {{ .Values.replicaCount }}
+  Payment:  {{ if .Values.payments.enabled }}enabled (testnet only){{ else }}disabled{{ end }}
+
+Access the app:
+  kubectl port-forward svc/{{ include "url-shortener.fullname" . }} 8080:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+  curl -fsS http://localhost:8080/livez
+  curl -fsS http://localhost:8080/ready
+  curl -fsS http://localhost:8080/metrics
+
+Verify pods are running:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+This chart accepts digest-pinned images only. The checked-in registry and
+digests are non-routable examples; render approved deployment configuration
+before applying it to an owned testnet cluster.
