@@ -1,0 +1,7 @@
+# Copy this file to a local backend.hcl, replace the bucket placeholder, then run:
+# terraform init -backend-config=backend.hcl
+#
+# The bucket must already exist, have object versioning enabled, and be private.
+# Do not put credentials or a project ID in this file; Terraform uses ADC.
+bucket = "REPLACE_WITH_YOUR_TERRAFORM_STATE_BUCKET"
+prefix = "resilience-gate/terraform"
