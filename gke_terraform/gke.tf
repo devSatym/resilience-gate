@@ -1,0 +1,99 @@
+resource "google_container_cluster" "gke_cluster" {
+  project  = var.project_id
+  name     = var.cluster_name
+  location = var.zone
+
+  network    = google_compute_network.gke_vpc.self_link
+  subnetwork = google_compute_subnetwork.gke_subnet.self_link
+
+  # A separately managed pool makes the cluster a Standard cluster and lets the
+  # node identity and Workload Identity metadata mode be explicit.
+  remove_default_node_pool = true
+  initial_node_count       = 1
+
+  deletion_protection   = var.deletion_protection
+  enable_shielded_nodes = true
+  networking_mode       = "VPC_NATIVE"
+
+  release_channel {
+    channel = "REGULAR"
+  }
+
+  ip_allocation_policy {
+    cluster_secondary_range_name  = local.cluster_secondary_range
+    services_secondary_range_name = local.svc_secondary_range
+  }
+
+  workload_identity_config {
+    workload_pool = "${var.project_id}.svc.id.goog"
+  }
+
+  logging_config {
+    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+  }
+
+  monitoring_config {
+    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+  }
+
+  resource_labels = local.common_labels
+
+  depends_on = [
+    google_project_service.compute,
+    google_project_service.container,
+  ]
+}
+
+resource "google_container_node_pool" "default" {
+  project    = var.project_id
+  name       = "default-pool"
+  location   = var.zone
+  cluster    = google_container_cluster.gke_cluster.name
+  node_count = var.default_node_count
+
+  management {
+    auto_repair  = true
+    auto_upgrade = true
+  }
+
+  upgrade_settings {
+    max_surge       = 1
+    max_unavailable = 0
+  }
+
+  node_config {
+    machine_type    = var.default_machine_type
+    disk_size_gb    = var.node_disk_size_gb
+    image_type      = "COS_CONTAINERD"
+    service_account = google_service_account.gke_nodes.email
+    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+
+    # This is the node-side half of Workload Identity. It prevents Pods from
+    # using legacy metadata-server credentials and directs them to GKE metadata.
+    workload_metadata_config {
+      mode = "GKE_METADATA"
+    }
+
+    metadata = {
+      disable-legacy-endpoints = "true"
+    }
+
+    shielded_instance_config {
+      enable_integrity_monitoring = true
+      enable_secure_boot          = true
+    }
+
+    labels = {
+      role = "default"
+    }
+
+    resource_labels = local.common_labels
+  }
+
+  depends_on = [
+    google_project_iam_member.gke_nodes_default_node_service_account,
+    google_project_iam_member.gke_nodes_log_writer,
+    google_project_iam_member.gke_nodes_metric_writer,
+    google_project_iam_member.gke_nodes_monitoring_viewer,
+  ]
+}
