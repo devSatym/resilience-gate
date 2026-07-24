@@ -21,6 +21,16 @@ if [[ -d helm/url-shortener ]]; then
   done
 fi
 
+if [[ -d gke_terraform ]]; then
+  command -v terraform >/dev/null 2>&1 || {
+    echo "terraform is required to validate gke_terraform" >&2
+    exit 1
+  }
+  terraform -chdir=gke_terraform fmt -check -recursive
+  terraform -chdir=gke_terraform init -backend=false -input=false >/dev/null
+  terraform -chdir=gke_terraform validate
+fi
+
 "$python_bin" -m pytest "$@"
 
 if command -v docker >/dev/null 2>&1; then

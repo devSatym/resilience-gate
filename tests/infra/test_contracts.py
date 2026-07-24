@@ -1,0 +1,107 @@
+"""Offline contracts for the portable GCP foundation.
+
+These tests intentionally inspect configuration rather than contacting GCP. They
+make dangerous regressions (such as a public registry or a hard-coded deployment
+identity) visible in credential-free pull-request validation.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+import re
+import unittest
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+TERRAFORM_DIR = REPOSITORY_ROOT / "gke_terraform"
+
+
+def terraform_source(name: str) -> str:
+    return (TERRAFORM_DIR / name).read_text(encoding="utf-8")
+
+
+def variable_block(source: str, name: str) -> str:
+    match = re.search(rf'variable "{re.escape(name)}" \{{(.*?)^\}}', source, re.MULTILINE | re.DOTALL)
+    if match is None:
+        raise AssertionError(f"variable {name!r} is not declared")
+    return match.group(1)
+
+
+class TerraformInfrastructureContracts(unittest.TestCase):
+    def test_backend_is_configured_at_init_time_with_a_safe_example(self) -> None:
+        main = terraform_source("main.tf")
+        backend_example = terraform_source("backend.hcl.example")
+
+        self.assertIn('backend "gcs" {}', main)
+        self.assertIn("REPLACE_WITH_YOUR_TERRAFORM_STATE_BUCKET", backend_example)
+        self.assertNotIn("ajprojectplatform", main + backend_example)
+        self.assertTrue((TERRAFORM_DIR / ".terraform.lock.hcl").is_file())
+
+    def test_deployment_identity_inputs_have_no_personal_defaults(self) -> None:
+        variables = terraform_source("variables.tf")
+        source = "\n".join(path.read_text(encoding="utf-8") for path in TERRAFORM_DIR.glob("*.tf"))
+
+        self.assertIn('variable "project_id"', variables)
+        self.assertIn('variable "github_repository"', variables)
+        self.assertIsNone(re.search(r"^\s*default\s*=", variable_block(variables, "project_id"), re.MULTILINE))
+        self.assertIsNone(
+            re.search(r"^\s*default\s*=", variable_block(variables, "github_repository"), re.MULTILINE)
+        )
+        self.assertNotIn("ajprojectplatform", source)
+        self.assertNotIn("amoghjay", source)
+
+    def test_registry_is_private_and_has_cleanup_rules(self) -> None:
+        registry = terraform_source("registry.tf")
+        source = "\n".join(path.read_text(encoding="utf-8") for path in TERRAFORM_DIR.glob("*.tf"))
+
+        self.assertNotIn("allUsers", source)
+        self.assertNotIn("allAuthenticatedUsers", source)
+        self.assertIn('format        = "DOCKER"', registry)
+        self.assertIn('tag_state  = "UNTAGGED"', registry)
+        self.assertIn('action = "KEEP"', registry)
+
+    def test_nodes_use_gke_metadata_for_workload_identity(self) -> None:
+        gke = terraform_source("gke.tf")
+
+        self.assertIn('workload_pool = "${var.project_id}.svc.id.goog"', gke)
+        self.assertIn("workload_metadata_config", gke)
+        self.assertIn('mode = "GKE_METADATA"', gke)
+        self.assertIn('disable-legacy-endpoints = "true"', gke)
+
+    def test_github_publisher_is_bound_to_repository_ref_and_event(self) -> None:
+        oidc = terraform_source("github-oidc.tf")
+
+        self.assertIn('"attribute.repository" = "assertion.repository"', oidc)
+        self.assertIn('"attribute.ref"        = "assertion.ref"', oidc)
+        self.assertIn('"attribute.event_name" = "assertion.event_name"', oidc)
+        self.assertIn("assertion.repository == '${var.github_repository}'", oidc)
+        self.assertIn("assertion.ref == '${var.github_oidc_ref}'", oidc)
+        self.assertIn("assertion.event_name in", oidc)
+        self.assertIn("google_artifact_registry_repository_iam_member", oidc)
+
+    def test_eso_and_kargo_use_distinct_least_privilege_identities(self) -> None:
+        eso = terraform_source("eso.tf")
+        kargo = terraform_source("kargo-identity.tf")
+        outputs = terraform_source("outputs.tf")
+
+        self.assertIn('account_id   = "external-secrets-sa"', eso)
+        self.assertIn("roles/secretmanager.secretAccessor", eso)
+        self.assertIn('account_id   = "kargo-gar-reader"', kargo)
+        self.assertIn("roles/artifactregistry.reader", kargo)
+        self.assertIn("kargo_workload_identity_binding", kargo)
+        self.assertIn('output "eso_gcp_service_account_email"', outputs)
+        self.assertIn('output "kargo_gcp_service_account_email"', outputs)
+
+        eso_account = re.search(r'account_id\s*=\s*"([^"]+)"', eso)
+        kargo_account = re.search(r'account_id\s*=\s*"([^"]+)"', kargo)
+        self.assertIsNotNone(eso_account)
+        self.assertIsNotNone(kargo_account)
+        self.assertNotEqual(
+            eso_account.group(1),
+            kargo_account.group(1),
+            "ESO and Kargo must never share a Google service account.",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
