@@ -1,0 +1,81 @@
+name: Build and publish application image
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - ".github/workflows/build-push.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/build-push.yaml"
+
+# A pull request gets only read access. The publish job receives OIDC only
+# after its validation dependency succeeds on the trusted main branch.
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate and build application image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.21.2
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+      - name: Install locked test environment
+        run: python -m pip install --requirement requirements-dev.txt
+      - name: Run credential-free validation
+        run: ./scripts/validate.sh
+      - name: Build application image without publishing
+        run: docker build --tag resilience-gate-app:ci ./app
+
+  publish:
+    name: Publish application image by OIDC
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GAR_LOCATION: ${{ vars.GAR_LOCATION }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
+      IMAGE: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/url-shortener
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require configured portable publishing inputs
+        run: |
+          test -n "$GAR_LOCATION"
+          test -n "$GCP_PROJECT_ID"
+          test -n "$GAR_REPOSITORY"
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_PUBLISHER_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Configure private registry authentication
+        run: gcloud auth configure-docker "${GAR_LOCATION}-docker.pkg.dev" --quiet
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push immutable candidate
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
