@@ -79,3 +79,53 @@ jobs:
           tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
           cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign and verify the emitted digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test -n "$DIGEST"
+          reference="${IMAGE}@${DIGEST}"
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build-push.yaml@refs/heads/main"
+          cosign sign --yes "$reference"
+          for attempt in 1 2 3; do
+            if cosign verify \
+              --certificate-identity "$identity" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$reference" >/dev/null; then
+              exit 0
+            fi
+            sleep "$attempt"
+          done
+          echo "Cosign verification failed for $reference" >&2
+          exit 1
+      - name: Write verified immutable identity record
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          WORKFLOW_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/build-push.yaml@refs/heads/main
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          digest = os.environ["DIGEST"]
+          if not digest.startswith("sha256:"):
+              raise SystemExit("build action did not emit a sha256 digest")
+          image = os.environ["IMAGE"]
+          record = {
+              "schemaVersion": 1,
+              "source": {"repository": os.environ["GITHUB_REPOSITORY"], "revision": os.environ["GITHUB_SHA"]},
+              "image": {"repository": image, "digest": digest, "reference": f"{image}@{digest}"},
+              "signature": {"scheme": "cosign-keyless", "subject": f"{image}@{digest}", "verified": True},
+              "build": {"workflow": os.environ["WORKFLOW_IDENTITY"], "run": os.environ["GITHUB_RUN_ID"]},
+          }
+          Path("artifact-identity.json").write_text(json.dumps(record, indent=2) + "\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: application-artifact-identity
+          path: artifact-identity.json
+          if-no-files-found: error
