@@ -33,6 +33,10 @@ fi
 
 "$python_bin" -m pytest "$@"
 
+if [[ -f signer/test_permit2.py ]]; then
+  "$python_bin" -m pytest signer/test_permit2.py
+fi
+
 if command -v docker >/dev/null 2>&1; then
   docker compose config --quiet
 fi

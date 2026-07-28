@@ -1,0 +1,130 @@
+name: Build and publish Permit2 signer image
+
+on:
+  pull_request:
+    paths:
+      - "signer/**"
+      - ".github/workflows/build-radius-signer.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "signer/**"
+      - ".github/workflows/build-radius-signer.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate and build signer image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.21.2
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+      - name: Install locked test environments
+        run: |
+          python -m pip install --requirement requirements-dev.txt
+          python -m pip install --requirement signer/requirements.lock
+      - name: Run credential-free validation
+        run: ./scripts/validate.sh
+      - name: Run signer unit and mocked startup tests
+        run: python -m pytest signer/test_permit2.py tests/signer
+      - name: Build signer image without publishing
+        run: docker build --tag resilience-gate-signer:ci ./signer
+
+  publish:
+    name: Publish signer image by OIDC
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GAR_LOCATION: ${{ vars.GAR_LOCATION }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
+      IMAGE: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/radius-signer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require configured portable publishing inputs
+        run: |
+          test -n "$GAR_LOCATION"
+          test -n "$GCP_PROJECT_ID"
+          test -n "$GAR_REPOSITORY"
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_PUBLISHER_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Configure private registry authentication
+        run: gcloud auth configure-docker "${GAR_LOCATION}-docker.pkg.dev" --quiet
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push immutable signer candidate
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./signer
+          file: ./signer/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign and verify signer digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test -n "$DIGEST"
+          reference="${IMAGE}@${DIGEST}"
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build-radius-signer.yaml@refs/heads/main"
+          cosign sign --yes "$reference"
+          cosign verify \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$reference" >/dev/null
+      - name: Write signer digest metadata
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          digest = os.environ["DIGEST"]
+          if not digest.startswith("sha256:"):
+              raise SystemExit("build action did not emit a sha256 digest")
+          image = os.environ["IMAGE"]
+          Path("signer-image-metadata.json").write_text(
+              json.dumps(
+                  {
+                      "schemaVersion": 1,
+                      "sourceRevision": os.environ["GITHUB_SHA"],
+                      "image": f"{image}@{digest}",
+                      "digest": digest,
+                      "signatureVerified": True,
+                  },
+                  indent=2,
+              )
+              + "\n"
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signer-image-metadata
+          path: signer-image-metadata.json
+          if-no-files-found: error
