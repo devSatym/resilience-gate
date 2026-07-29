@@ -31,6 +31,25 @@ if [[ -d gke_terraform ]]; then
   terraform -chdir=gke_terraform validate
 fi
 
+# Check committed shell entrypoints without accidentally treating a developer's
+# ignored local configuration as a CI input.
+while IFS= read -r -d '' shell_script; do
+  bash -n "$shell_script"
+done < <(git ls-files -z -- '*.sh')
+
+# Render only Kustomizations that are actually committed. This keeps a local
+# worktree with future or experimental manifests from changing CI behavior.
+mapfile -d '' -t kustomizations < <(git ls-files -z -- 'kubernetes/**/kustomization.yaml')
+if (( ${#kustomizations[@]} > 0 )); then
+  command -v kubectl >/dev/null 2>&1 || {
+    echo "kubectl is required to validate committed Kustomizations" >&2
+    exit 1
+  }
+  for kustomization in "${kustomizations[@]}"; do
+    kubectl kustomize "$(dirname "$kustomization")" >/dev/null
+  done
+fi
+
 "$python_bin" -m pytest "$@"
 
 if [[ -f signer/test_permit2.py ]]; then
