@@ -1,4 +1,4 @@
-.PHONY: test validate validate-platform smoke-local local-up local-down
+.PHONY: test validate validate-platform config render-config bootstrap smoke-local local-up local-down
 
 PYTHON ?= python3
 
@@ -10,6 +10,15 @@ validate:
 
 validate-platform:
 	PYTHON=$(PYTHON) ./scripts/validate.sh
+
+config:
+	@test -f platform_setup_scripts/config.env || cp platform_setup_scripts/config.env.example platform_setup_scripts/config.env
+
+render-config:
+	./platform_setup_scripts/render_config.py --write
+
+bootstrap:
+	./platform_setup_scripts/bootstrap.sh
 
 smoke-local:
 	./scripts/smoke-local.sh

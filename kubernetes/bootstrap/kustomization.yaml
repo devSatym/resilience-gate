@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # C055: establish GitOps access only. Future workloads are intentionally not
+  # listed here until their own reviewed phase adds them.
+  - secrets/cluster-secret-store.yaml
+  - secrets/external-secrets-argocd.yaml
