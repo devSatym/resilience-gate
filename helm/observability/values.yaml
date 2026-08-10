@@ -1,0 +1,17 @@
+# Base ownership and administrator-secret contract for the pinned telemetry
+# stack. Storage, targets, and log collection land in later reviewed commits.
+kube-prometheus-stack:
+  alertmanager:
+    enabled: false
+
+  grafana:
+    admin:
+      existingSecret: grafana-admin-secret
+      userKey: username
+      passwordKey: password
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+        labelValue: "1"
+        searchNamespace: ALL
