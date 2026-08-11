@@ -1,0 +1,31 @@
+{{- range .Values.appNamespaces }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: url-shortener-{{ . }}
+  namespace: {{ . }}
+  labels:
+    # Must match the kube-prometheus-stack serviceMonitorSelector
+    release: observability
+spec:
+  # Sets job="url-shortener" on scraped metrics. The Service selector is
+  # deliberately exact so unrelated Services in an app namespace are never
+  # accidentally added to a gate's query population.
+  jobLabel: "app.kubernetes.io/name"
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      sampleLimit: 10000
+      labelLimit: 30
+      # Copy the k8s namespace into a `namespace` label so {namespace="..."} works in PromQL
+      relabelings:
+        - action: replace
+          sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+{{- end }}

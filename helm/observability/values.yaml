@@ -1,5 +1,10 @@
-# Base ownership and administrator-secret contract for the pinned telemetry
-# stack. Storage, targets, and log collection land in later reviewed commits.
+# Namespaces with application ServiceMonitors. Adding one is a reviewed change
+# because it deliberately expands telemetry collection scope.
+appNamespaces:
+  - url-shortener-dev
+  - url-shortener-staging
+  - url-shortener-prod
+
 kube-prometheus-stack:
   alertmanager:
     enabled: false
@@ -15,3 +20,24 @@ kube-prometheus-stack:
         label: grafana_dashboard
         labelValue: "1"
         searchNamespace: ALL
+
+  prometheus:
+    prometheusSpec:
+      retention: 7d
+      retentionSize: 8GB
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: standard
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+      # ServiceMonitors are selected by an explicit label rather than by a
+      # release-wide catch-all. Namespace selection is intentionally broad so
+      # the small reviewed allowlist above can span environments.
+      serviceMonitorSelector:
+        matchLabels:
+          release: observability
+      serviceMonitorNamespaceSelector: {}
+      serviceMonitorSelectorNilUsesHelmValues: false
