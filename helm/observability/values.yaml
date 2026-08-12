@@ -5,6 +5,10 @@ appNamespaces:
   - url-shortener-staging
   - url-shortener-prod
 
+# This is a non-secret label on log streams, not an infrastructure credential.
+clusterName: resilience-gate
+lokiGatewayUrl: http://observability-loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push
+
 kube-prometheus-stack:
   alertmanager:
     enabled: false
@@ -14,6 +18,13 @@ kube-prometheus-stack:
       existingSecret: grafana-admin-secret
       userKey: username
       passwordKey: password
+    additionalDataSources:
+      - name: Loki
+        uid: loki
+        type: loki
+        access: proxy
+        url: http://observability-loki-gateway.monitoring.svc.cluster.local
+        isDefault: false
     sidecar:
       dashboards:
         enabled: true
@@ -41,3 +52,62 @@ kube-prometheus-stack:
           release: observability
       serviceMonitorNamespaceSelector: {}
       serviceMonitorSelectorNilUsesHelmValues: false
+
+loki:
+  deploymentMode: SingleBinary
+  gateway:
+    enabled: true
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+    compactor:
+      retention_enabled: true
+      delete_request_store: filesystem
+    limits_config:
+      retention_period: 72h
+  singleBinary:
+    replicas: 1
+    persistence:
+      enabled: true
+      storageClass: standard
+      size: 10Gi
+  backend:
+    replicas: 0
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+
+# Alloy uses the Kubernetes API log source rather than the retired Promtail
+# chart or host-path scraping. A single replica avoids duplicate log streams.
+alloy:
+  controller:
+    type: deployment
+    replicas: 1
+  alloy:
+    configMap:
+      create: false
+      name: observability-alloy-config
+      key: config.alloy
+    enableReporting: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+  serviceAccount:
+    create: true
+    automountServiceAccountToken: true
