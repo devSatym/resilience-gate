@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-demo-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+data:
+  chaos-demo.json: |
+    {
+      "uid": "resilience-gate-chaos",
+      "title": "Resilience Gate — chaos verification",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "time": {"from": "now-30m", "to": "now"},
+      "tags": ["resilience-gate", "chaos"],
+      "templating": {
+        "list": [{
+          "name": "namespace",
+          "label": "Environment",
+          "type": "custom",
+          "query": "url-shortener-staging,url-shortener-prod,url-shortener-dev",
+          "current": {"text": "url-shortener-staging", "value": "url-shortener-staging"}
+        }]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "User traffic during experiment",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "targets": [{"refId": "A", "expr": "sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/livez|/ready\"}[1m])) by (handler)", "legendFormat": "{{ "{{handler}}" }}"}],
+          "fieldConfig": {"defaults": {"unit": "reqps"}}
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "5xx rate (must remain bounded)",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "targets": [{"refId": "A", "expr": "sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",status=~\"5..\"}[1m]))", "legendFormat": "5xx/s"}],
+          "fieldConfig": {"defaults": {"unit": "reqps"}}
+        },
+        {
+          "id": 3,
+          "type": "logs",
+          "title": "Application logs (probes excluded)",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 0, "y": 8, "w": 12, "h": 11},
+          "targets": [{"refId": "A", "expr": "{namespace=\"$namespace\",app=\"url-shortener\"} |!= \"/livez\" |!= \"/ready\"", "queryType": "range"}],
+          "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending"}
+        },
+        {
+          "id": 4,
+          "type": "logs",
+          "title": "Chaos gate scorecard logs",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 12, "y": 8, "w": 12, "h": 11},
+          "targets": [{"refId": "A", "expr": "{namespace=\"url-shortener\",pod=~\".*chaos-gate.*\"}", "queryType": "range"}],
+          "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending"}
+        }
+      ]
+    }
