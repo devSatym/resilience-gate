@@ -5,3 +5,7 @@ resources:
   # listed here until their own reviewed phase adds them.
   - secrets/cluster-secret-store.yaml
   - secrets/external-secrets-argocd.yaml
+  # C060: telemetry namespace, Application, and credentials must exist before
+  # metric-driven gates are introduced.
+  - observability.yaml
+  - secrets/external-secrets-monitoring.yaml

@@ -35,8 +35,8 @@ done
 log_info "Applying ClusterSecretStore"
 k8s_apply "$css_file"
 if ! is_dry_run; then
-  wait_for "ClusterSecretStore gcp-secret-manager" \
-    "kubectl get clustersecretstore gcp-secret-manager -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' | grep -qx True" \
+  wait_for "ClusterSecretStore resilience-gate-secrets" \
+    "kubectl get clustersecretstore resilience-gate-secrets -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' | grep -qx True" \
     120
 fi
 
@@ -54,6 +54,22 @@ if ! is_dry_run; then
   wait_for "root-app registered by Argo CD" \
     "kubectl get application root-app --namespace argocd >/dev/null" \
     120
+fi
+
+# C060 appends observability resources to bootstrap/kustomization.yaml. Wait
+# for their child Application only when that reviewed phase is present; C055
+# stays useful on its own and never attempts future promotion resources.
+if grep -qx -- '  - observability.yaml' "$REPO_ROOT/kubernetes/bootstrap/kustomization.yaml" 2>/dev/null; then
+  if is_dry_run; then
+    log_info "Dry run: would verify observability Application and Grafana ExternalSecret"
+  else
+    wait_for "observability Application registered by root-app" \
+      "kubectl get application observability --namespace argocd >/dev/null" \
+      180
+    wait_for "Grafana credentials synced" \
+      "kubectl get secret grafana-admin-secret --namespace monitoring >/dev/null" \
+      180
+  fi
 fi
 
 log_ok "Phase 05 complete"
