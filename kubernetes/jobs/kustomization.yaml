@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: url-shortener-staging
+
+resources:
+  # C061: signer and narrowly scoped credential contracts.
+  - external-secret-loadgen.yaml
+  - external-secret-signer.yaml
+  - radius-signer.yaml
