@@ -1,7 +1,7 @@
 import http from 'k6/http';
 import encoding from 'k6/encoding';
 import { check, sleep } from 'k6';
-import { Rate } from 'k6/metrics';
+import { Rate, Trend } from 'k6/metrics';
 
 // This script is intentionally inert until a caller supplies BASE_URL (and,
 // for paid traffic, SIGNER_URL). That makes `k6 run` without reviewed job
@@ -17,6 +17,9 @@ const shorten402Rate = new Rate('shorten_402_rate');
 const shorten409Rate = new Rate('shorten_409_rate');
 const shorten5xxRate = new Rate('shorten_5xx_rate');
 const redirectOkRate = new Rate('redirect_ok_rate');
+const independentRedirectOkRate = new Rate('independent_redirect_ok_rate');
+const endToEndSuccessRate = new Rate('end_to_end_success_rate');
+const endToEndDuration = new Trend('end_to_end_duration_ms', true);
 
 function environment(name, fallback = '') {
   return String(__ENV[name] === undefined ? fallback : __ENV[name]).trim();
@@ -89,12 +92,14 @@ const PAYMENT_BUFFER = positiveInteger(
   environment('PRECHECK_BALANCE_BUFFER_PAYMENTS', '5'),
   1000,
 );
+const REDIRECT_PROBE_URL = environment('REDIRECT_PROBE_URL');
 
 const thresholds = {
   'http_req_duration{endpoint:sign}': ['p(95)<100'],
   'http_req_duration{endpoint:shorten}': ['p(95)<1000'],
   'http_req_duration{endpoint:redirect}': ['p(95)<100'],
   http_req_failed: ['rate<0.05'],
+  end_to_end_success_rate: ['rate>0.90'],
   shorten_201_rate: ['rate>0.90'],
   redirect_ok_rate: ['rate>0.95'],
 };
@@ -103,6 +108,10 @@ if (PAYMENT_ENABLED) {
   thresholds.sign_success_rate = ['rate>0.99'];
   thresholds.payment_settled_rate = ['rate>0.95'];
 }
+if (REDIRECT_PROBE_URL) {
+  thresholds.independent_redirect_ok_rate = ['rate>0.95'];
+}
+
 const paymentScenario = LOAD_PROFILE === 'arrival-rate'
   ? {
       executor: 'constant-arrival-rate',
@@ -124,7 +133,18 @@ const paymentScenario = LOAD_PROFILE === 'arrival-rate'
       gracefulStop: '15s',
     };
 
-export const options = { scenarios: { payment_flow: paymentScenario }, thresholds };
+const scenarios = { payment_flow: paymentScenario };
+if (REDIRECT_PROBE_URL) {
+  scenarios.independent_redirects = {
+    executor: 'constant-vus',
+    exec: 'independentRedirectProbe',
+    vus: 1,
+    duration: DURATION,
+    gracefulStop: '15s',
+  };
+}
+
+export const options = { scenarios, thresholds };
 
 function validateConfiguration() {
   normaliseHttpUrl('BASE_URL', BASE_URL);
@@ -141,6 +161,8 @@ function validateConfiguration() {
   if (!/^0x[a-fA-F0-9]{40}$/.test(SBC_CONTRACT)) {
     fail('SBC_CONTRACT_ADDRESS must be a 20-byte hexadecimal address');
   }
+  if (REDIRECT_PROBE_URL) normaliseHttpUrl('REDIRECT_PROBE_URL', REDIRECT_PROBE_URL);
+
   if (!PAYMENT_ENABLED) return;
 
   normaliseHttpUrl('SIGNER_URL', SIGNER_URL);
@@ -306,6 +328,7 @@ function redirectFromShorten(shortenResponse, appUrl) {
 }
 
 export function paymentFlow() {
+  const started = Date.now();
   const appUrl = normaliseHttpUrl('BASE_URL', BASE_URL);
   let paymentSignature = null;
 
@@ -323,6 +346,8 @@ export function paymentFlow() {
     if (signResponse.status !== 200) {
       signSuccessRate.add(false);
       paymentSettledRate.add(false);
+      endToEndSuccessRate.add(false);
+      endToEndDuration.add(Date.now() - started);
       return;
     }
 
@@ -332,11 +357,15 @@ export function paymentFlow() {
     } catch (_) {
       signSuccessRate.add(false);
       paymentSettledRate.add(false);
+      endToEndSuccessRate.add(false);
+      endToEndDuration.add(Date.now() - started);
       return;
     }
     if (!signerBody.signature || !signerBody.permit2Authorization) {
       signSuccessRate.add(false);
       paymentSettledRate.add(false);
+      endToEndSuccessRate.add(false);
+      endToEndDuration.add(Date.now() - started);
       return;
     }
     signSuccessRate.add(true);
@@ -363,9 +392,23 @@ export function paymentFlow() {
     paymentSettledRate.add(created);
   }
 
-  if (created) redirectFromShorten(shorten, appUrl);
+  const redirected = created && redirectFromShorten(shorten, appUrl);
+  endToEndSuccessRate.add(Boolean(created && redirected));
+  endToEndDuration.add(Date.now() - started);
 
   if (LOAD_PROFILE === 'closed-loop') sleep(SLEEP_SECONDS);
+}
+
+export function independentRedirectProbe() {
+  if (!REDIRECT_PROBE_URL) return;
+  const response = http.get(normaliseHttpUrl('REDIRECT_PROBE_URL', REDIRECT_PROBE_URL), {
+    redirects: 0,
+    tags: { endpoint: 'redirect' },
+  });
+  const succeeded = response.status === 302;
+  check(response, { 'independent redirect 302': (result) => result.status === 302 });
+  independentRedirectOkRate.add(succeeded);
+  sleep(SLEEP_SECONDS);
 }
 
 // Preserve the ordinary k6 entrypoint for local reviewers while the CronJob
