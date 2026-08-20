@@ -8,3 +8,12 @@ resources:
   - external-secret-loadgen.yaml
   - external-secret-signer.yaml
   - radius-signer.yaml
+  # C064: a suspended CronJob; Argo CD must never start a load run on sync.
+  - loadgen-job.yaml
+
+# C064: let Kustomize hash the script ConfigMap. A changed script therefore
+# changes the CronJob pod template instead of reusing a mutable ConfigMap name.
+configMapGenerator:
+  - name: k6-loadgen-script
+    files:
+      - loadgen.js=scripts/loadgen.js

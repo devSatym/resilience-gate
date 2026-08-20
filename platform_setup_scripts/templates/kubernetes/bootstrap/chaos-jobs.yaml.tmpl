@@ -1,0 +1,25 @@
+# Generated from local config.env by render_config.py.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: chaos-jobs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: "{{GITHUB_REPOSITORY_URL}}"
+    targetRevision: main
+    path: kubernetes/jobs
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: url-shortener-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

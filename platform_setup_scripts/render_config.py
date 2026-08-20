@@ -27,6 +27,7 @@ TEMPLATES = (
     Path("kubernetes/bootstrap/secrets/external-secrets-argocd.yaml"),
     Path("kubernetes/argocd/root-app.yaml"),
     Path("kubernetes/bootstrap/observability.yaml"),
+    Path("kubernetes/bootstrap/chaos-jobs.yaml"),
 )
 TOKEN = re.compile(r"\{\{\s*([A-Z][A-Z0-9_]*)\s*\}\}")
 PROJECT_ID = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")

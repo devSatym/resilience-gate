@@ -1,0 +1,125 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: loadgen
+  namespace: url-shortener-staging
+  labels:
+    app.kubernetes.io/name: loadgen
+    app.kubernetes.io/component: load-generator
+    app.kubernetes.io/part-of: resilience-gate
+spec:
+  # Argo CD syncs must never start a paid testnet run. Operators create a one-
+  # off Job explicitly through scripts/run-loadgen.sh with --execute.
+  suspend: true
+  # An intentionally impossible date is a second guard if suspension is ever
+  # accidentally removed. `suspend: true` remains the primary control.
+  schedule: "0 0 31 2 *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: loadgen
+        app.kubernetes.io/component: load-generator
+        app.kubernetes.io/part-of: resilience-gate
+    spec:
+      backoffLimit: 0
+      # Must exceed DURATION plus bounded prechecks and summary serialization.
+      # Keep this in sync with the C065 runner's allowed duration range.
+      activeDeadlineSeconds: 780
+      # Preserve the completed Pod for a day so its JSON summary can be copied.
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: loadgen
+            app.kubernetes.io/component: load-generator
+            app.kubernetes.io/part-of: resilience-gate
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          terminationGracePeriodSeconds: 30
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 12345
+            runAsGroup: 12345
+            fsGroup: 12345
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: k6
+              # grafana/k6:0.54.0 manifest-list digest, verified when this
+              # manifest was authored. This is an immutable upstream runtime.
+              image: grafana/k6@sha256:1f40432b1cbe7234e977f96c362c9bc550a2d2b583d014dd8669fe40d3e9e755
+              imagePullPolicy: IfNotPresent
+              args:
+                - run
+                - --summary-export=/results/summary.json
+                - /scripts/loadgen.js
+              envFrom:
+                - secretRef:
+                    name: resilience-gate-loadgen-credentials
+              env:
+                # Disable k6's anonymous usage report; the runner should only
+                # contact explicitly configured in-cluster/testnet endpoints.
+                - name: K6_NO_USAGE_REPORT
+                  value: "true"
+                - name: BASE_URL
+                  value: "http://url-shortener-staging.url-shortener-staging.svc.cluster.local"
+                - name: SIGNER_URL
+                  value: "http://radius-signer.url-shortener-staging.svc.cluster.local:8080"
+                - name: PAYMENT_ENABLED
+                  value: "true"
+                - name: VUS
+                  value: "3"
+                - name: LOAD_PROFILE
+                  value: "arrival-rate"
+                - name: ARRIVAL_RATE
+                  value: "60"
+                - name: ARRIVAL_TIME_UNIT
+                  value: "1m"
+                - name: DURATION
+                  value: "10m"   # must outlast the chaos Workflow (~7.5m)
+                - name: NETWORK_CAIP2
+                  value: "eip155:72344"
+                - name: SBC_CONTRACT_ADDRESS
+                  value: "0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb"
+                - name: SBC_AMOUNT
+                  value: "1000"
+                - name: PRECHECK_TIMEOUT
+                  value: "5s"
+                - name: PRECHECK_BALANCE_BUFFER_PAYMENTS
+                  value: "10"
+              resources:
+                requests:
+                  cpu: "250m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "1000m"
+                  memory: "1Gi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: k6-script
+                  mountPath: /scripts
+                  readOnly: true
+                - name: results
+                  mountPath: /results
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: k6-script
+              configMap:
+                name: k6-loadgen-script
+            - name: results
+              emptyDir:
+                sizeLimit: 16Mi
+            - name: tmp
+              emptyDir:
+                sizeLimit: 32Mi

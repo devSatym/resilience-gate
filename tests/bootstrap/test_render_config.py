@@ -54,10 +54,12 @@ def test_renderer_writes_and_checks_only_public_configuration(tmp_path: Path) ->
     root_app = (tmp_path / "kubernetes/argocd/root-app.yaml").read_text(encoding="utf-8")
     store = (tmp_path / "kubernetes/bootstrap/secrets/cluster-secret-store.yaml").read_text(encoding="utf-8")
     external_secret = (tmp_path / "kubernetes/bootstrap/secrets/external-secrets-argocd.yaml").read_text(encoding="utf-8")
+    chaos_jobs = (tmp_path / "kubernetes/bootstrap/chaos-jobs.yaml").read_text(encoding="utf-8")
 
     assert "https://github.com/example/resilience-gate.git" in root_app
     assert "resilience-gate-123" in store
     assert "github_pat" in external_secret
+    assert "https://github.com/example/resilience-gate.git" in chaos_jobs
     assert "{{PROJECT_ID}}" not in store
 
 
