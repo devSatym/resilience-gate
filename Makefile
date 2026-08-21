@@ -1,4 +1,4 @@
-.PHONY: test validate validate-platform config render-config bootstrap smoke-local local-up local-down
+.PHONY: test validate validate-platform config render-config bootstrap loadgen-plan smoke-local local-up local-down
 
 PYTHON ?= python3
 
@@ -19,6 +19,9 @@ render-config:
 
 bootstrap:
 	./platform_setup_scripts/bootstrap.sh
+
+loadgen-plan:
+	./scripts/run-loadgen.sh --plan
 
 smoke-local:
 	./scripts/smoke-local.sh
