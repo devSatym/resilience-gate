@@ -1,0 +1,9 @@
+# Kargo creates the Project namespace. This project is intentionally limited to
+# the owned testnet promotion chain; it is not a live-network release control.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: resilience-gate
+  labels:
+    app.kubernetes.io/part-of: resilience-gate
+    resilience-gate.io/scope: testnet-only
