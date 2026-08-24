@@ -1,0 +1,29 @@
+# Run `make render-config` before applying this manifest. Repository and
+# registry identifiers are public operator configuration, not repository-owned
+# identities. Each selected image is carried into Freight by OCI digest.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: resilience-gate
+  namespace: resilience-gate
+  labels:
+    app.kubernetes.io/part-of: resilience-gate
+    resilience-gate.io/scope: testnet-only
+spec:
+  subscriptions:
+    # CI's sha-* labels are discovery hints only. The promotion templates use
+    # the Freight digest, never this mutable lookup tag, as deployment identity.
+    - image:
+        repoURL: "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener"
+        imageSelectionStrategy: NewestBuild
+        allowTagsRegexes:
+          - "^sha-[a-f0-9]{7,40}$"
+        ignoreTagsRegexes:
+          - "^(latest|buildcache|pr-[0-9]+)$"
+    # The rendered env/* branches are outputs, never Freight sources. Only the
+    # chart and environment values on main create a new source revision.
+    - git:
+        repoURL: "{{GITHUB_REPOSITORY_URL}}"
+        branch: main
+        includePaths:
+          - helm/url-shortener
