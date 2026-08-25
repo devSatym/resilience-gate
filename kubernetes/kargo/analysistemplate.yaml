@@ -1,0 +1,26 @@
+# This reusable AnalysisTemplate performs only an in-cluster readiness check.
+# It is safe to define before the later chaos gate exists and contains no
+# workload image or external endpoint that could make promotion non-hermetic.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: service-health
+  namespace: resilience-gate
+  labels:
+    app.kubernetes.io/part-of: resilience-gate
+    resilience-gate.io/scope: testnet-only
+spec:
+  args:
+    - name: service-url
+  metrics:
+    - name: readiness
+      count: 3
+      interval: 15s
+      failureLimit: 0
+      consecutiveSuccessLimit: 2
+      provider:
+        web:
+          url: "{{args.service-url}}/ready"
+          timeoutSeconds: 5
+          jsonPath: "{$.status}"
+      successCondition: result == "ready"
