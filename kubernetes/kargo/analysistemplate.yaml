@@ -24,3 +24,41 @@ spec:
           timeoutSeconds: 5
           jsonPath: "{$.status}"
       successCondition: result == "ready"
+---
+# A production-like testnet promotion requires both readiness and liveness
+# after Argo CD has reconciled the digest-pinned render. It deliberately does
+# not claim to replace the later chaos gate.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: prod-post-deploy-health
+  namespace: resilience-gate
+  labels:
+    app.kubernetes.io/part-of: resilience-gate
+    resilience-gate.io/scope: testnet-only
+spec:
+  args:
+    - name: service-url
+  metrics:
+    - name: readiness
+      count: 3
+      interval: 15s
+      failureLimit: 0
+      consecutiveSuccessLimit: 2
+      provider:
+        web:
+          url: "{{args.service-url}}/ready"
+          timeoutSeconds: 5
+          jsonPath: "{$.status}"
+      successCondition: result == "ready"
+    - name: liveness
+      count: 2
+      interval: 15s
+      failureLimit: 0
+      consecutiveSuccessLimit: 2
+      provider:
+        web:
+          url: "{{args.service-url}}/livez"
+          timeoutSeconds: 5
+          jsonPath: "{$.status}"
+      successCondition: result == "alive"
