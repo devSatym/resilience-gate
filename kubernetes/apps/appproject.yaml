@@ -1,0 +1,30 @@
+# Run `make render-config` before applying this manifest. This AppProject is
+# deliberately scoped to the reviewed GitOps repository and three owned
+# testnet workload namespaces rather than Argo CD's unrestricted default.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: resilience-gate
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: resilience-gate
+    resilience-gate.io/scope: testnet-only
+spec:
+  description: Rendered, digest-pinned Resilience Gate workload environments.
+  sourceRepos:
+    - "{{GITHUB_REPOSITORY_URL}}"
+  destinations:
+    - namespace: url-shortener-dev
+      server: https://kubernetes.default.svc
+    - namespace: url-shortener-staging
+      server: https://kubernetes.default.svc
+    - namespace: url-shortener-prod
+      server: https://kubernetes.default.svc
+  # Rendered application branches are namespaced only. Namespace creation is
+  # intentionally not delegated: ApplicationSet keeps CreateNamespace false
+  # and bootstrap remains the explicit owner of cluster-scoped setup.
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true
