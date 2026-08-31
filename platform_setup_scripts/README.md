@@ -30,10 +30,12 @@ Git; phase 02 prompts silently or streams from a source project through stdin.
 | 03 | Terraform plan and apply | Always saves a plan; no interactive input means no apply |
 | 04 | Controller installation | Exact chart versions and persistent Kargo credentials |
 | 05 | Secret store, repository credential, root app | Exact target context and rendered-manifest check |
+| 06 | GitOps and Kargo configuration | Registers contracts only; does not start promotion, paid load, or chaos |
 
-The orchestrator intentionally stops at phase 05. It does not apply future
-promotion, chaos, or production activation resources before their roadmap
-phases are implemented and reviewed.
+The orchestrator intentionally stops at phase 06. It registers only the
+rendered-branch configuration required for later promotion. A production-like
+testnet promotion, paid load generation, or chaos experiment remains an
+explicit action with its own reviewed contract.
 
 ## Useful commands
 

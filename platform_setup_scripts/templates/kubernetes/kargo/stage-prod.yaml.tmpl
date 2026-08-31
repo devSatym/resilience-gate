@@ -1,0 +1,87 @@
+# This is a production-like testnet Stage, not a live-network release target.
+# Bootstrap keeps it inactive until the later immutable chaos verification is
+# wired; the annotation gives that handoff an explicit machine-readable guard.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: prod
+  namespace: resilience-gate
+  annotations:
+    resilience-gate.io/activation: deferred-until-c089
+  labels:
+    app.kubernetes.io/part-of: resilience-gate
+    resilience-gate.io/scope: testnet-only
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: resilience-gate
+      sources:
+        stages:
+          - staging
+  promotionTemplate:
+    spec:
+      vars:
+        - name: gitopsRepo
+          value: "{{GITHUB_REPOSITORY_URL}}"
+        - name: imageRepo
+          value: "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener"
+        - name: sourcePath
+          value: ./src
+        - name: renderedPath
+          value: ./out
+        - name: targetBranch
+          value: env/${{ ctx.stage }}
+      steps:
+        - uses: git-clone
+          config:
+            repoURL: ${{ vars.gitopsRepo }}
+            checkout:
+              - commit: ${{ commitFrom(vars.gitopsRepo).ID }}
+                path: ${{ vars.sourcePath }}
+              - branch: ${{ vars.targetBranch }}
+                create: true
+                path: ${{ vars.renderedPath }}
+        - uses: yaml-update
+          config:
+            path: ${{ vars.sourcePath }}/helm/url-shortener/values-${{ ctx.stage }}.yaml
+            updates:
+              - key: image.repository
+                value: ${{ vars.imageRepo }}
+              - key: image.digest
+                value: ${{ imageFrom(vars.imageRepo).Digest }}
+        - uses: git-clear
+          config:
+            path: ${{ vars.renderedPath }}
+        - uses: helm-template
+          config:
+            path: ${{ vars.sourcePath }}/helm/url-shortener
+            releaseName: url-shortener-${{ ctx.stage }}
+            namespace: url-shortener-${{ ctx.stage }}
+            valuesFiles:
+              - ${{ vars.sourcePath }}/helm/url-shortener/values.yaml
+              - ${{ vars.sourcePath }}/helm/url-shortener/values-${{ ctx.stage }}.yaml
+            outPath: ${{ vars.renderedPath }}
+        - uses: git-commit
+          as: commit
+          config:
+            path: ${{ vars.renderedPath }}
+            message: "render ${{ ctx.stage }} from ${{ commitFrom(vars.gitopsRepo).ID }} with ${{ imageFrom(vars.imageRepo).Digest }}"
+        - uses: git-push
+          config:
+            path: ${{ vars.renderedPath }}
+            branch: ${{ vars.targetBranch }}
+        - uses: argocd-update
+          config:
+            apps:
+              - name: resilience-gate-${{ ctx.stage }}
+                namespace: argocd
+                sources:
+                  - repoURL: ${{ vars.gitopsRepo }}
+                    desiredRevision: ${{ outputs.commit.commit }}
+  verification:
+    analysisTemplates:
+      - name: prod-post-deploy-health
+    args:
+      - name: service-url
+        value: http://url-shortener-${{ ctx.stage }}.url-shortener-${{ ctx.stage }}.svc.cluster.local

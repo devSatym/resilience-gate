@@ -1,0 +1,52 @@
+# Run `make render-config` before applying this manifest. Each Application
+# tracks a Kargo-owned rendered branch; the source repository itself is a
+# local public operator input, never a committed account or organization URL.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: resilience-gate
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: resilience-gate
+    resilience-gate.io/scope: testnet-only
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - list:
+        elements:
+          - environment: dev
+            namespace: url-shortener-dev
+          - environment: staging
+            namespace: url-shortener-staging
+          - environment: prod
+            namespace: url-shortener-prod
+  template:
+    metadata:
+      name: "resilience-gate-{{ .environment }}"
+      namespace: argocd
+      labels:
+        app.kubernetes.io/part-of: resilience-gate
+        resilience-gate.io/environment: "{{ .environment }}"
+        resilience-gate.io/scope: testnet-only
+      annotations:
+        # Required before Kargo may request a sync for this exact Stage.
+        kargo.akuity.io/authorized-stage: "resilience-gate:{{ .environment }}"
+    spec:
+      project: resilience-gate
+      source:
+        repoURL: "{{GITHUB_REPOSITORY_URL}}"
+        targetRevision: "env/{{ .environment }}"
+        path: .
+        directory:
+          recurse: true
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .namespace }}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=false

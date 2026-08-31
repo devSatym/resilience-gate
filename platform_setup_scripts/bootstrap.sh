@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Safe orchestrator for the completed bootstrap phases. It deliberately stops
-# at phase 05: later GitOps and promotion resources are introduced only when
-# their own reviewed roadmap phases are available.
+# Safe orchestrator for the reviewed bootstrap phases. It stops at phase 06:
+# registration of GitOps/Kargo configuration never triggers a promotion, paid
+# load run, or chaos experiment on its own.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,10 +19,11 @@ Completed phases:
   03  Terraform              saved plan, explicit approval, target context
   04  controllers            pinned cert-manager, Argo, ESO, and Kargo
   05  root GitOps            secret store, repository credential, root app
+  06  GitOps/Kargo config    ordered rendered-branch configuration only
 
 `--render-config` writes public manifests and exits. Review and commit that
-diff before running any mutating phase. Future promotion phases are purposely
-not dispatched by this version of the orchestrator.
+diff before running any mutating phase. Promotion, paid load generation, and
+chaos verification remain explicitly deferred to their later contracts.
 EOF
 }
 
@@ -34,6 +35,7 @@ phase_index() {
     3|03) printf '3' ;;
     4|04) printf '4' ;;
     5|05) printf '5' ;;
+    6|06) printf '6' ;;
     *) return 1 ;;
   esac
 }
@@ -80,19 +82,19 @@ fi
 
 if [ -n "$phase_single" ]; then
   if ! start=$(phase_index "$phase_single"); then
-    printf '[ERR ] phase must be between 00 and 05\n' >&2
+    printf '[ERR ] phase must be between 00 and 06\n' >&2
     exit 2
   fi
   end="$start"
 else
   start=0
-  end=5
+  end=6
   if [ -n "$phase_from" ] && ! start=$(phase_index "$phase_from"); then
-    printf '[ERR ] --from must be between 00 and 05\n' >&2
+    printf '[ERR ] --from must be between 00 and 06\n' >&2
     exit 2
   fi
   if [ -n "$phase_to" ] && ! end=$(phase_index "$phase_to"); then
-    printf '[ERR ] --to must be between 00 and 05\n' >&2
+    printf '[ERR ] --to must be between 00 and 06\n' >&2
     exit 2
   fi
 fi
@@ -121,6 +123,7 @@ phase_files=(
   "$SCRIPT_DIR/03-terraform.sh"
   "$SCRIPT_DIR/04-platform.sh"
   "$SCRIPT_DIR/05-cluster-resources.sh"
+  "$SCRIPT_DIR/06-gitops-and-kargo.sh"
 )
 
 log_step "Resilience Gate platform bootstrap"

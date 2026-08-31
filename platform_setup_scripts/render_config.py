@@ -28,6 +28,13 @@ TEMPLATES = (
     Path("kubernetes/argocd/root-app.yaml"),
     Path("kubernetes/bootstrap/observability.yaml"),
     Path("kubernetes/bootstrap/chaos-jobs.yaml"),
+    Path("kubernetes/kargo/credentials-git.yaml"),
+    Path("kubernetes/kargo/warehouse.yaml"),
+    Path("kubernetes/kargo/stage-dev.yaml"),
+    Path("kubernetes/kargo/stage-staging.yaml"),
+    Path("kubernetes/kargo/stage-prod.yaml"),
+    Path("kubernetes/apps/appproject.yaml"),
+    Path("kubernetes/apps/applicationset.yaml"),
 )
 TOKEN = re.compile(r"\{\{\s*([A-Z][A-Z0-9_]*)\s*\}\}")
 PROJECT_ID = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
