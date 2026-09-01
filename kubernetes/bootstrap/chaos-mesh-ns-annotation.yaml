@@ -1,0 +1,11 @@
+# This is the single namespace deliberately opted into Chaos Mesh. The
+# controller also enforces enableFilterNamespace=true in chaos-mesh.yaml.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: url-shortener-staging
+  annotations:
+    chaos-mesh.org/inject: enabled
+    # Removing this bootstrap resource must not cascade-delete workloads or
+    # persistent volumes owned by the staging environment.
+    argocd.argoproj.io/sync-options: Prune=false

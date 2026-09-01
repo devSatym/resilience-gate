@@ -1,0 +1,57 @@
+# Chaos Mesh is deliberately constrained to annotated namespaces. The only
+# annotation committed with this phase is on url-shortener-staging; do not add
+# the annotation to a production namespace as part of a release rollout.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: chaos-mesh
+  namespace: argocd
+  annotations:
+    # Reconcile after observability and before the later gate resources.
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.chaos-mesh.org
+    chart: chaos-mesh
+    # Pin the chart rather than accepting a moving release line.
+    targetRevision: "2.8.2"
+    helm:
+      values: |
+        # Disable an optional diagnostic endpoint. The controller and daemon
+        # are controlled through Kubernetes manifests rather than a dashboard.
+        enableProfiling: false
+
+        chaosDaemon:
+          # GKE nodes use containerd, not the chart's Docker default.
+          runtime: containerd
+          socketPath: /run/containerd/containerd.sock
+
+        controllerManager:
+          replicaCount: 1
+          # Defense in depth: a target namespace must opt in with
+          # chaos-mesh.org/inject=enabled before it can receive a fault.
+          enableFilterNamespace: true
+          # This platform only needs bounded PodChaos workflows. Do not enable
+          # unrelated fault controllers by default.
+          enabledControllers:
+            - podchaos
+            - workflow
+
+        # Do not expose the privileged controller through the optional
+        # dashboard or install its auxiliary DNS controller.
+        dashboard:
+          create: false
+        dnsServer:
+          create: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: chaos-mesh
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Workflow CRDs can exceed the client-side apply annotation limit.
+      - ServerSideApply=true
