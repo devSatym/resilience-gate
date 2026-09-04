@@ -1,0 +1,19 @@
+# Bounded Redis dependency unavailability. The selector is tied to the
+# staging Helm release and its master component, never every Redis pod in the
+# cluster.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: redis-pod-failure
+  namespace: url-shortener-staging
+spec:
+  action: pod-failure
+  mode: one
+  duration: 60s
+  selector:
+    namespaces:
+      - url-shortener-staging
+    labelSelectors:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/instance: url-shortener-staging
+      app.kubernetes.io/component: master

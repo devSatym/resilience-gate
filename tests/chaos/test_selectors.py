@@ -64,3 +64,15 @@ def test_postgresql_fault_is_bounded_to_the_staging_primary() -> None:
             "app.kubernetes.io/component": "primary",
         },
     )
+
+
+def test_redis_fault_is_bounded_to_the_staging_master() -> None:
+    assert_bounded_staging_pod_failure(
+        load_yaml(EXPERIMENTS / "03-redis-pod-failure.yaml"),
+        name="redis-pod-failure",
+        labels={
+            "app.kubernetes.io/name": "redis",
+            "app.kubernetes.io/instance": STAGING_NAMESPACE,
+            "app.kubernetes.io/component": "master",
+        },
+    )
