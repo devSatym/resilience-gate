@@ -76,3 +76,16 @@ def test_redis_fault_is_bounded_to_the_staging_master() -> None:
             "app.kubernetes.io/component": "master",
         },
     )
+
+
+def test_signer_fault_is_bounded_to_the_staging_signer() -> None:
+    assert_bounded_staging_pod_failure(
+        load_yaml(EXPERIMENTS / "04-signer-pod-failure.yaml"),
+        name="signer-pod-failure",
+        labels={
+            "app": "radius-signer",
+            "app.kubernetes.io/name": "radius-signer",
+            "app.kubernetes.io/component": "signer",
+            "app.kubernetes.io/part-of": "resilience-gate",
+        },
+    )

@@ -1,0 +1,20 @@
+# Bounded signer dependency unavailability. Requiring both the stable
+# Kubernetes labels and the workload's app label keeps the fault scoped to the
+# staging permit-signing deployment.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: signer-pod-failure
+  namespace: url-shortener-staging
+spec:
+  action: pod-failure
+  mode: one
+  duration: 60s
+  selector:
+    namespaces:
+      - url-shortener-staging
+    labelSelectors:
+      app: radius-signer
+      app.kubernetes.io/name: radius-signer
+      app.kubernetes.io/component: signer
+      app.kubernetes.io/part-of: resilience-gate
