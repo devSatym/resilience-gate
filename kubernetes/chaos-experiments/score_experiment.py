@@ -487,3 +487,79 @@ def evaluate_check(
     except Exception as exc:  # fail closed, including an adapter implementation bug
         return _check_result_from_error(check, expression, exc)
 
+
+# C080 — PostgreSQL traffic and recovery rules -----------------------------
+
+POSTGRES_CHECKS = (
+    CheckDefinition(
+        identifier="meaningful-traffic",
+        name="meaningful non-probe traffic flowed during the PostgreSQL fault",
+        expression=(
+            'sum(increase(http_requests_total{{namespace="{namespace}", '
+            'handler!~"/(livez|ready|metrics)"}}[{window}s]))'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator=">",
+        threshold=50,
+        unit="requests",
+    ),
+    CheckDefinition(
+        identifier="app-restarts",
+        name="the application did not restart during PostgreSQL unavailability",
+        expression=(
+            'max(increase(kube_pod_container_status_restarts_total{{namespace="{namespace}", '
+            'container="url-shortener"}}[{window}s])) or vector(0)'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator="<",
+        threshold=0.5,
+        unit="restarts",
+    ),
+    CheckDefinition(
+        identifier="postgres-outage-observed",
+        name="the PostgreSQL dependency was observed unavailable",
+        expression=(
+            'min(url_shortener_dependency_up{{namespace="{namespace}", dependency="postgres"}})'
+        ),
+        query_kind="range",
+        aggregation="min",
+        operator="==",
+        threshold=0,
+        unit="state",
+    ),
+    CheckDefinition(
+        identifier="postgres-recovered",
+        name="the application observed PostgreSQL recovery before the window ended",
+        expression=(
+            'min(url_shortener_dependency_up{{namespace="{namespace}", dependency="postgres"}})'
+        ),
+        query_kind="range",
+        aggregation="last",
+        operator="==",
+        threshold=1,
+        unit="state",
+    ),
+    CheckDefinition(
+        identifier="postgres-clean-degradation",
+        name="PostgreSQL unavailability did not produce unhandled /shorten 500 responses",
+        expression=(
+            'sum(increase(http_requests_total{{namespace="{namespace}", handler="/shorten", '
+            'status="500"}}[{window}s])) or vector(0)'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator="<",
+        threshold=0.5,
+        unit="responses",
+    ),
+)
+
+
+EXPERIMENTS: Mapping[str, ExperimentDefinition] = {
+    "postgres-pod-failure": ExperimentDefinition(
+        identifier="postgres-pod-failure", settle_seconds=60, checks=POSTGRES_CHECKS
+    ),
+}
+
