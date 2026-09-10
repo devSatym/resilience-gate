@@ -557,9 +557,89 @@ POSTGRES_CHECKS = (
 )
 
 
+# C081 — Redis fallback latency and recovery rules -------------------------
+
+REDIS_CHECKS = (
+    CheckDefinition(
+        identifier="meaningful-traffic",
+        name="meaningful non-probe traffic flowed during the Redis fault",
+        expression=(
+            'sum(increase(http_requests_total{{namespace="{namespace}", '
+            'handler!~"/(livez|ready|metrics)"}}[{window}s]))'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator=">",
+        threshold=50,
+        unit="requests",
+    ),
+    CheckDefinition(
+        identifier="redis-fallback-observed",
+        name="the application exercised the Redis-miss fallback path",
+        expression=(
+            'sum(increase(url_shortener_cache_misses_total{{namespace="{namespace}"}}[{window}s]))'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator=">",
+        threshold=0,
+        unit="fallbacks",
+    ),
+    CheckDefinition(
+        identifier="redirect-latency",
+        name="redirect p95 stayed below the degraded-mode latency bound",
+        expression=(
+            'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket'
+            '{{namespace="{namespace}", handler="/{{code}}"}}[1m])) by (le))'
+        ),
+        query_kind="range",
+        aggregation="max",
+        operator="<",
+        threshold=1.2,
+        unit="seconds",
+    ),
+    CheckDefinition(
+        identifier="app-restarts",
+        name="the application did not restart during Redis unavailability",
+        expression=(
+            'max(increase(kube_pod_container_status_restarts_total{{namespace="{namespace}", '
+            'container="url-shortener"}}[{window}s])) or vector(0)'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator="<",
+        threshold=0.5,
+        unit="restarts",
+    ),
+    CheckDefinition(
+        identifier="redis-outage-observed",
+        name="the Redis dependency was observed unavailable",
+        expression='min(url_shortener_dependency_up{{namespace="{namespace}", dependency="redis"}})',
+        query_kind="range",
+        aggregation="min",
+        operator="==",
+        threshold=0,
+        unit="state",
+    ),
+    CheckDefinition(
+        identifier="redis-recovered",
+        name="the application observed Redis recovery before the window ended",
+        expression='min(url_shortener_dependency_up{{namespace="{namespace}", dependency="redis"}})',
+        query_kind="range",
+        aggregation="last",
+        operator="==",
+        threshold=1,
+        unit="state",
+    ),
+)
+
+
 EXPERIMENTS: Mapping[str, ExperimentDefinition] = {
     "postgres-pod-failure": ExperimentDefinition(
         identifier="postgres-pod-failure", settle_seconds=60, checks=POSTGRES_CHECKS
+    ),
+    "redis-pod-failure": ExperimentDefinition(
+        identifier="redis-pod-failure", settle_seconds=60, checks=REDIS_CHECKS
     ),
 }
 
