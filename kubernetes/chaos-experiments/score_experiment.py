@@ -634,6 +634,71 @@ REDIS_CHECKS = (
 )
 
 
+# C082 — signer recovery and application-isolation rules -------------------
+
+SIGNER_CHECKS = (
+    CheckDefinition(
+        identifier="signer-outage-observed",
+        name="the signer readiness metric was observed unavailable",
+        expression='min(signer_ready{{namespace="{namespace}"}})',
+        query_kind="range",
+        aggregation="min",
+        operator="==",
+        threshold=0,
+        unit="state",
+    ),
+    CheckDefinition(
+        identifier="signer-recovered",
+        name="the signer became ready again before the observation window ended",
+        expression='min(signer_ready{{namespace="{namespace}"}})',
+        query_kind="range",
+        aggregation="last",
+        operator="==",
+        threshold=1,
+        unit="state",
+    ),
+    CheckDefinition(
+        identifier="app-restarts",
+        name="the application did not restart while the signer was unavailable",
+        expression=(
+            'max(increase(kube_pod_container_status_restarts_total{{namespace="{namespace}", '
+            'container="url-shortener"}}[{window}s])) or vector(0)'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator="<",
+        threshold=0.5,
+        unit="restarts",
+    ),
+    CheckDefinition(
+        identifier="app-5xx",
+        name="the application did not return /shorten 5xx responses during signer recovery",
+        expression=(
+            'sum(increase(http_requests_total{{namespace="{namespace}", handler="/shorten", '
+            'status=~"5.."}}[{window}s])) or vector(0)'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator="<",
+        threshold=0.5,
+        unit="responses",
+    ),
+    CheckDefinition(
+        identifier="payment-replays",
+        name="the signer fault did not produce a reused-settlement replay",
+        expression=(
+            'sum(increase(url_shortener_payment_replays_total{{namespace="{namespace}"}}[{window}s])) '
+            'or vector(0)'
+        ),
+        query_kind="instant",
+        aggregation="value",
+        operator="<",
+        threshold=0.5,
+        unit="replays",
+    ),
+)
+
+
 EXPERIMENTS: Mapping[str, ExperimentDefinition] = {
     "postgres-pod-failure": ExperimentDefinition(
         identifier="postgres-pod-failure", settle_seconds=60, checks=POSTGRES_CHECKS
@@ -641,5 +706,7 @@ EXPERIMENTS: Mapping[str, ExperimentDefinition] = {
     "redis-pod-failure": ExperimentDefinition(
         identifier="redis-pod-failure", settle_seconds=60, checks=REDIS_CHECKS
     ),
+    "signer-pod-failure": ExperimentDefinition(
+        identifier="signer-pod-failure", settle_seconds=60, checks=SIGNER_CHECKS
+    ),
 }
-
