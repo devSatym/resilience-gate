@@ -1,0 +1,16 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {"dependency": "postgres"},
+        "values": [
+          [1790856000, "1"],
+          [1790856015, "0"],
+          [1790856030, "1"]
+        ]
+      }
+    ]
+  }
+}

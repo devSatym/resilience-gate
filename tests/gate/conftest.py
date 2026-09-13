@@ -92,3 +92,37 @@ def range_result(
         series=(scorer.TimeSeries(labels={}, samples=samples),),
     )
 
+
+def stale_range_result(scorer: ModuleType, window: object, value: float = 1.0) -> object:
+    """A syntactically valid result whose last sample predates the window tail."""
+
+    first = window.start
+    samples = tuple(
+        scorer.Sample(timestamp=first + timedelta(seconds=15 * index), value=value)
+        for index in range(3)
+    )
+    return scorer.QueryResult(
+        kind="range",
+        expression="synthetic",
+        series=(scorer.TimeSeries(labels={}, samples=samples),),
+    )
+
+
+@pytest.fixture
+def scripted_reader():
+    return ScriptedReader
+
+
+@pytest.fixture
+def instant_evidence(scorer):
+    return lambda at, value: instant_result(scorer, at, value)
+
+
+@pytest.fixture
+def range_evidence(scorer):
+    return lambda window, values: range_result(scorer, window, values)
+
+
+@pytest.fixture
+def stale_range_evidence(scorer):
+    return lambda window, value=1.0: stale_range_result(scorer, window, value)

@@ -35,6 +35,13 @@ DEFAULT_NAMESPACE = "url-shortener-staging"
 DEFAULT_STEP_SECONDS = 15
 DEFAULT_TIMEOUT_SECONDS = 15
 
+# C083 tightens range validation with these explicit limits. They are kept
+# here, rather than inferred from a query, so changes require a reviewed
+# threshold change.
+MIN_RANGE_SAMPLES = 3
+MAX_SAMPLE_GAP_SECONDS = 75
+MAX_SAMPLE_STALENESS_SECONDS = 60
+
 SCHEMA_VERSION = "resilience-gate.scorecard/v1"
 _DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -431,6 +438,43 @@ def aggregate(result: QueryResult, aggregation: str) -> tuple[float, int]:
     raise EvidenceError(f"unsupported aggregation: {aggregation}")
 
 
+def validate_range_coverage(result: QueryResult, window: ExperimentWindow) -> None:
+    """Reject range series that could hide a telemetry outage or stale scrape."""
+
+    if result.kind != "range":
+        raise QueryResponseError("range coverage validation requires a range result")
+    latest_allowed_start = window.start + timedelta(seconds=MAX_SAMPLE_STALENESS_SECONDS)
+    earliest_allowed_end = window.end - timedelta(seconds=MAX_SAMPLE_STALENESS_SECONDS)
+    for index, series in enumerate(result.series):
+        samples = series.samples
+        if len(samples) < MIN_RANGE_SAMPLES:
+            raise InsufficientEvidenceError(
+                f"range series {index} has {len(samples)} samples; need at least {MIN_RANGE_SAMPLES}"
+            )
+        if samples[0].timestamp > latest_allowed_start:
+            raise StaleEvidenceError("range evidence starts too late for the observation window")
+        if samples[-1].timestamp < earliest_allowed_end:
+            raise StaleEvidenceError("range evidence ends before the observation window")
+        for prior, current in zip(samples, samples[1:]):
+            if current.timestamp - prior.timestamp > timedelta(seconds=MAX_SAMPLE_GAP_SECONDS):
+                raise StaleEvidenceError("range evidence contains a scrape gap beyond the limit")
+
+
+def validate_instant_freshness(result: QueryResult, evaluated_at: datetime) -> None:
+    """Require an instant vector to be a fresh single scalar at query time."""
+
+    if result.kind != "instant":
+        raise QueryResponseError("instant freshness validation requires an instant result")
+    samples = _all_samples(result)
+    if len(samples) != 1:
+        raise InsufficientEvidenceError("instant query must return exactly one sample")
+    age = abs((evaluated_at - samples[0].timestamp).total_seconds())
+    if age > MAX_SAMPLE_STALENESS_SECONDS:
+        raise StaleEvidenceError(
+            f"instant evidence is stale by {age:.0f}s; limit is {MAX_SAMPLE_STALENESS_SECONDS}s"
+        )
+
+
 def _check_result_from_error(
     check: CheckDefinition, expression: str, error: EvidenceError | Exception
 ) -> CheckResult:
@@ -465,10 +509,12 @@ def evaluate_check(
             result = client.query_range(expression, window.start, window.end)
             if result.kind != "range":
                 raise QueryResponseError("reader returned a non-range result for a range query")
+            validate_range_coverage(result, window)
         else:
             result = client.query_instant(expression, window.end)
             if result.kind != "instant":
                 raise QueryResponseError("reader returned a non-instant result for an instant query")
+            validate_instant_freshness(result, window.end)
         observed, sample_count = aggregate(result, check.aggregation)
         passed = _OPERATORS[check.operator](observed, check.threshold)
         return CheckResult(

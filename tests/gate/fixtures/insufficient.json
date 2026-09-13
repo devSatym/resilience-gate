@@ -1,0 +1,15 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {"dependency": "redis"},
+        "values": [
+          [1790855980, "1"],
+          [1790856100, "0"]
+        ]
+      }
+    ]
+  }
+}
