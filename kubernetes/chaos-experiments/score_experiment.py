@@ -756,3 +756,288 @@ EXPERIMENTS: Mapping[str, ExperimentDefinition] = {
         identifier="signer-pod-failure", settle_seconds=60, checks=SIGNER_CHECKS
     ),
 }
+
+
+# C084 — release-linked scorecard contract ---------------------------------
+
+@dataclass(frozen=True)
+class ReleaseIdentity:
+    """Immutable identity required to make a scorecard useful to promotion."""
+
+    revision: str | None = None
+    image_digest: str | None = None
+    run_id: str | None = None
+
+    def validation_error(self) -> str | None:
+        if not self.revision or not self.revision.strip():
+            return "release revision is required"
+        if not self.image_digest or not _DIGEST_RE.fullmatch(self.image_digest):
+            return "release image digest must be a lowercase sha256 digest"
+        if not self.run_id or not _RUN_ID_RE.fullmatch(self.run_id):
+            return "run id is required and must be a bounded safe identifier"
+        return None
+
+    def as_dict(self) -> dict[str, str | None]:
+        return {
+            "revision": self.revision,
+            "image_digest": self.image_digest,
+            "run_id": self.run_id,
+        }
+
+
+@dataclass(frozen=True)
+class Scorecard:
+    """Portable result with enough provenance to approve or reject one release."""
+
+    experiment: str
+    window: ExperimentWindow | None
+    checks: tuple[CheckResult, ...]
+    release: ReleaseIdentity
+    generated_at: datetime
+
+    @property
+    def verdict(self) -> Literal["pass", "fail"]:
+        return "pass" if all(check.verdict == "pass" for check in self.checks) else "fail"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "experiment": self.experiment,
+            "verdict": self.verdict,
+            "generated_at": format_utc_timestamp(self.generated_at),
+            "release": self.release.as_dict(),
+            "window": (
+                None
+                if self.window is None
+                else {
+                    "inject_at": format_utc_timestamp(self.window.inject_at),
+                    "start": format_utc_timestamp(self.window.start),
+                    "end": format_utc_timestamp(self.window.end),
+                    "duration_seconds": self.window.duration_seconds,
+                    "settle_seconds": self.window.settle_seconds,
+                }
+            ),
+            "checks": [check.as_dict() for check in self.checks],
+        }
+
+
+def _release_identity_check(release: ReleaseIdentity) -> CheckResult:
+    error = release.validation_error()
+    return CheckResult(
+        identifier="release-identity",
+        name="scorecard is linked to an immutable release and a bounded run id",
+        verdict="fail" if error else "pass",
+        observed=None,
+        operator="==",
+        threshold=1,
+        unit="metadata",
+        expression="release identity validation",
+        query_kind="instant",
+        sample_count=0,
+        reason=error,
+        evidence_error="invalid_release_identity" if error else None,
+    )
+
+
+def evaluate_experiment(
+    experiment: str,
+    inject_at: str | datetime,
+    duration_seconds: int,
+    *,
+    client: PrometheusReader,
+    namespace: str = DEFAULT_NAMESPACE,
+    release: ReleaseIdentity | None = None,
+    require_release_identity: bool = False,
+    generated_at: datetime | None = None,
+) -> Scorecard:
+    """Evaluate all checks, retaining every failure instead of short-circuiting.
+
+    ``require_release_identity`` is false for unit-level scorer controls and
+    true for the CLI gate. A real promotion verdict therefore cannot pass
+    without an immutable digest, revision, and run identifier.
+    """
+
+    definition = EXPERIMENTS.get(experiment)
+    if definition is None:
+        raise EvidenceError(f"unknown experiment: {experiment}")
+    window = make_window(inject_at, duration_seconds, definition.settle_seconds)
+    results = tuple(
+        evaluate_check(check, client=client, namespace=namespace, window=window)
+        for check in definition.checks
+    )
+    identity = release or ReleaseIdentity()
+    if require_release_identity:
+        results = results + (_release_identity_check(identity),)
+    timestamp = generated_at or datetime.now(timezone.utc)
+    if timestamp.tzinfo is None:
+        raise EvidenceError("generated_at must include a timezone")
+    return Scorecard(
+        experiment=definition.identifier,
+        window=window,
+        checks=results,
+        release=identity,
+        generated_at=timestamp.astimezone(timezone.utc),
+    )
+
+
+def score(
+    experiment: str,
+    inject_at: str | datetime,
+    duration: int,
+    *,
+    client: PrometheusReader | None = None,
+    namespace: str = DEFAULT_NAMESPACE,
+) -> bool:
+    """Compatibility helper: return an evidence-only pass/fail boolean.
+
+    The command-line gate uses :func:`evaluate_experiment` with release
+    identity required; this helper intentionally remains useful for synthetic
+    scorer tests without manufacturing release metadata.
+    """
+
+    reader = client or PrometheusHTTPClient(PROM)
+    card = evaluate_experiment(
+        experiment,
+        inject_at,
+        duration,
+        client=reader,
+        namespace=namespace,
+        require_release_identity=False,
+    )
+    return card.verdict == "pass"
+
+
+def validate_scorecard_shape(payload: Any) -> None:
+    """Minimal dependency-free guard for scorecards emitted by this module."""
+
+    root = _as_mapping(payload, "scorecard")
+    required = {
+        "schema_version",
+        "experiment",
+        "verdict",
+        "generated_at",
+        "release",
+        "window",
+        "checks",
+    }
+    missing = sorted(required.difference(root))
+    if missing:
+        raise EvidenceError(f"scorecard is missing required fields: {', '.join(missing)}")
+    if root["schema_version"] != SCHEMA_VERSION:
+        raise EvidenceError("scorecard schema version is unsupported")
+    if root["verdict"] not in {"pass", "fail"}:
+        raise EvidenceError("scorecard verdict must be pass or fail")
+    _as_mapping(root["release"], "scorecard release")
+    if root["window"] is not None:
+        _as_mapping(root["window"], "scorecard window")
+    if not isinstance(root["checks"], list) or not root["checks"]:
+        raise EvidenceError("scorecard must contain at least one check")
+    for index, check in enumerate(root["checks"]):
+        item = _as_mapping(check, f"scorecard checks[{index}]")
+        if item.get("verdict") not in {"pass", "fail"}:
+            raise EvidenceError(f"scorecard checks[{index}] has an invalid verdict")
+
+
+def write_scorecard(card: Scorecard, path: Path) -> None:
+    """Write deterministic JSON only to an explicitly requested artifact path."""
+
+    payload = card.as_dict()
+    validate_scorecard_shape(payload)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def _invalid_invocation_card(
+    *, experiment: str, release: ReleaseIdentity, error: Exception
+) -> Scorecard:
+    check = CheckResult(
+        identifier="scorer-invocation",
+        name="the scorer received a valid bounded experiment invocation",
+        verdict="fail",
+        observed=None,
+        operator="==",
+        threshold=1,
+        unit="metadata",
+        expression="scorer invocation validation",
+        query_kind="instant",
+        sample_count=0,
+        reason=str(error),
+        evidence_error=error.code if isinstance(error, EvidenceError) else "unexpected_error",
+    )
+    checks = (check, _release_identity_check(release))
+    return Scorecard(
+        experiment=experiment,
+        window=None,
+        checks=checks,
+        release=release,
+        generated_at=datetime.now(timezone.utc),
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("experiment", choices=sorted(EXPERIMENTS))
+    parser.add_argument("--inject-at", required=True, help="RFC3339 UTC fault start time")
+    parser.add_argument("--duration", type=int, required=True, help="fault duration in seconds")
+    parser.add_argument(
+        "--prom",
+        default=os.environ.get("PROM_URL", PROM),
+        help="Prometheus base URL (default: PROM_URL or the in-cluster service)",
+    )
+    parser.add_argument(
+        "--namespace",
+        default=os.environ.get("CHAOS_NAMESPACE", DEFAULT_NAMESPACE),
+        help="target workload namespace",
+    )
+    parser.add_argument(
+        "--release-revision",
+        default=os.environ.get("RELEASE_REVISION"),
+        help="rendered Git revision for the evaluated release",
+    )
+    parser.add_argument(
+        "--release-digest",
+        default=os.environ.get("RELEASE_DIGEST"),
+        help="immutable image digest for the evaluated release",
+    )
+    parser.add_argument(
+        "--run-id",
+        default=os.environ.get("CHAOS_RUN_ID"),
+        help="bounded identifier for this isolated chaos run",
+    )
+    parser.add_argument(
+        "--scorecard-path",
+        type=Path,
+        help="optional path for the structured JSON scorecard",
+    )
+    args = parser.parse_args(argv)
+
+    release = ReleaseIdentity(
+        revision=args.release_revision,
+        image_digest=args.release_digest,
+        run_id=args.run_id,
+    )
+    try:
+        card = evaluate_experiment(
+            args.experiment,
+            args.inject_at,
+            args.duration,
+            client=PrometheusHTTPClient(args.prom),
+            namespace=args.namespace,
+            release=release,
+            require_release_identity=True,
+        )
+    except Exception as exc:  # configuration/query setup failure must yield FAIL JSON
+        card = _invalid_invocation_card(experiment=args.experiment, release=release, error=exc)
+
+    payload = card.as_dict()
+    validate_scorecard_shape(payload)
+    if args.scorecard_path:
+        write_scorecard(card, args.scorecard_path)
+    print(json.dumps(payload, sort_keys=True))
+    return 0 if card.verdict == "pass" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
