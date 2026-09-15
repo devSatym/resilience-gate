@@ -1,0 +1,148 @@
+name: Build and publish chaos gate runner
+
+# C085 snapshot: the initial image carries the reviewed scorer. C086/C088
+# expand this path list as orchestration and annotation code is introduced.
+on:
+  pull_request:
+    paths:
+      - "docker/gate-runner/**"
+      - "kubernetes/chaos-experiments/score_experiment.py"
+      - ".github/workflows/build-gate-runner.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "docker/gate-runner/**"
+      - "kubernetes/chaos-experiments/score_experiment.py"
+      - ".github/workflows/build-gate-runner.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate and build gate runner
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install locked test environment
+        run: python -m pip install --requirement requirements-dev.txt
+      - name: Exercise offline gate contracts
+        run: python -m pytest tests/ci/test_workflows.py tests/gate
+      - name: Build gate runner without publishing
+        run: docker build --tag resilience-gate-gate-runner:ci --file docker/gate-runner/Dockerfile .
+
+  publish:
+    name: Publish gate runner by OIDC
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GAR_LOCATION: ${{ vars.GAR_LOCATION }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
+      IMAGE: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/gate-runner
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require configured portable publishing inputs
+        run: |
+          test -n "$GAR_LOCATION"
+          test -n "$GCP_PROJECT_ID"
+          test -n "$GAR_REPOSITORY"
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_PUBLISHER_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Configure private registry authentication
+        run: gcloud auth configure-docker "${GAR_LOCATION}-docker.pkg.dev" --quiet
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push immutable gate runner
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/gate-runner/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign and verify the emitted gate runner digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test -n "$DIGEST"
+          reference="${IMAGE}@${DIGEST}"
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/build-gate-runner.yaml@refs/heads/main"
+          cosign sign --yes "$reference"
+          for attempt in 1 2 3; do
+            if cosign verify \
+              --certificate-identity "$identity" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$reference" >/dev/null; then
+              exit 0
+            fi
+            sleep "$attempt"
+          done
+          echo "Cosign verification failed for $reference" >&2
+          exit 1
+      - name: Write verified immutable gate-runner identity record
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          WORKFLOW_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/build-gate-runner.yaml@refs/heads/main
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          digest = os.environ["DIGEST"]
+          if not digest.startswith("sha256:"):
+              raise SystemExit("build action did not emit a sha256 digest")
+          image = os.environ["IMAGE"]
+          record = {
+              "schemaVersion": 1,
+              "source": {
+                  "repository": os.environ["GITHUB_REPOSITORY"],
+                  "revision": os.environ["GITHUB_SHA"],
+              },
+              "image": {
+                  "repository": image,
+                  "digest": digest,
+                  "reference": f"{image}@{digest}",
+              },
+              "signature": {
+                  "scheme": "cosign-keyless",
+                  "subject": f"{image}@{digest}",
+                  "verified": True,
+              },
+              "build": {
+                  "workflow": os.environ["WORKFLOW_IDENTITY"],
+                  "run": os.environ["GITHUB_RUN_ID"],
+              },
+          }
+          Path("gate-runner-artifact-identity.json").write_text(
+              json.dumps(record, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gate-runner-artifact-identity
+          path: gate-runner-artifact-identity.json
+          if-no-files-found: error
