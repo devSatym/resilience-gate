@@ -1,0 +1,52 @@
+# C086 snapshot: the gate Job runs in the Kargo project namespace and receives
+# only staging permissions to create and clean up its own load Job/Workflow.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chaos-gate
+  namespace: resilience-gate
+  labels:
+    app.kubernetes.io/component: chaos-gate
+    app.kubernetes.io/part-of: resilience-gate
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chaos-gate-runner
+  namespace: url-shortener-staging
+rules:
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["workflows"]
+    verbs: ["get", "create", "patch", "delete"]
+  # Chaos Mesh validates this raw singular spelling independently of kubectl's
+  # normal plural resource discovery.
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["workflow"]
+    verbs: ["create", "delete"]
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["workflownodes"]
+    verbs: ["get", "list"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chaos-gate-runner
+  namespace: url-shortener-staging
+subjects:
+  - kind: ServiceAccount
+    name: chaos-gate
+    namespace: resilience-gate
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chaos-gate-runner
