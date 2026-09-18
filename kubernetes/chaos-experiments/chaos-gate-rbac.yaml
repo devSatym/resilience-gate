@@ -1,5 +1,7 @@
-# C086 snapshot: the gate Job runs in the Kargo project namespace and receives
-# only staging permissions to create and clean up its own load Job/Workflow.
+# The AnalysisTemplate Job runs in the Kargo project namespace. Its Service
+# Account gets the smallest cross-namespace permission set needed to start one
+# staging load run, create one bounded Chaos Mesh Workflow, observe it, and
+# remove only objects it created.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -10,6 +12,36 @@ metadata:
     app.kubernetes.io/part-of: resilience-gate
 automountServiceAccountToken: true
 ---
+# A Lease serialises chaos runs. A failed pod's Lease expires after a bounded
+# duration; takeover uses resourceVersion in orchestrate.sh rather than an
+# unconditional overwrite.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chaos-gate-lock
+  namespace: resilience-gate
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chaos-gate-lock
+  namespace: resilience-gate
+subjects:
+  - kind: ServiceAccount
+    name: chaos-gate
+    namespace: resilience-gate
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chaos-gate-lock
+---
+# This Role lives where faults and load generation occur. There is no
+# cluster-wide role and no permission to alter application Deployments,
+# Services, Secrets, or unrelated Jobs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -18,15 +50,18 @@ metadata:
 rules:
   - apiGroups: ["chaos-mesh.org"]
     resources: ["workflows"]
-    verbs: ["get", "create", "patch", "delete"]
-  # Chaos Mesh validates this raw singular spelling independently of kubectl's
-  # normal plural resource discovery.
+    verbs: ["get", "list", "create", "patch", "delete"]
+  # Chaos Mesh validates this singular resource spelling in a raw
+  # SubjectAccessReview, distinct from kubectl's normalised plural lookup.
   - apiGroups: ["chaos-mesh.org"]
     resources: ["workflow"]
     verbs: ["create", "delete"]
   - apiGroups: ["chaos-mesh.org"]
     resources: ["workflownodes"]
     verbs: ["get", "list"]
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["podchaos"]
+    verbs: ["get", "list", "delete"]
   - apiGroups: ["batch"]
     resources: ["cronjobs"]
     verbs: ["get"]
