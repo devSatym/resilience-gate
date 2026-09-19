@@ -1,18 +1,25 @@
 name: Build and publish chaos gate runner
 
-# C085 snapshot: the initial image carries the reviewed scorer. C086/C088
-# expand this path list as orchestration and annotation code is introduced.
+# The image contains the orchestration code, so every baked input retriggers
+# validation and publication. Pull requests build only; publishing is limited
+# to a successful trusted-main validation job.
 on:
   pull_request:
     paths:
       - "docker/gate-runner/**"
+      - "kubernetes/chaos-experiments/orchestrate.sh"
       - "kubernetes/chaos-experiments/score_experiment.py"
+      - "kubernetes/chaos-experiments/annotate.py"
+      - "kubernetes/chaos-experiments/workflow.yaml"
       - ".github/workflows/build-gate-runner.yaml"
   push:
     branches: [main]
     paths:
       - "docker/gate-runner/**"
+      - "kubernetes/chaos-experiments/orchestrate.sh"
       - "kubernetes/chaos-experiments/score_experiment.py"
+      - "kubernetes/chaos-experiments/annotate.py"
+      - "kubernetes/chaos-experiments/workflow.yaml"
       - ".github/workflows/build-gate-runner.yaml"
   workflow_dispatch:
 
