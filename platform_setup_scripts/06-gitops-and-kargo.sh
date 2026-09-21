@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Phase 06 — register the reviewable GitOps and Kargo configuration. This
-# phase deliberately does not create a Promotion, a paid load Job, or a Chaos
-# Mesh experiment; later gates add those actions only after their contracts
-# and cleanup behavior are available.
+# Phase 06 — register reviewed GitOps, Kargo, and complete chaos-gate
+# configuration. Registration never creates a Promotion, paid load Job, or
+# Chaos Mesh Workflow: only a later manually requested staging promotion can
+# cause Kargo's AnalysisRun to start the bounded gate.
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +29,7 @@ declare -A manifests=(
   [credentials]="$REPO_ROOT/kubernetes/kargo/credentials-git.yaml"
   [project_config]="$REPO_ROOT/kubernetes/kargo/projectconfig.yaml"
   [analysis]="$REPO_ROOT/kubernetes/kargo/analysistemplate.yaml"
+  [chaos_gate]="$REPO_ROOT/kubernetes/bootstrap/chaos-gate.yaml"
   [app_project]="$REPO_ROOT/kubernetes/apps/appproject.yaml"
   [app_set]="$REPO_ROOT/kubernetes/apps/applicationset.yaml"
   [dev]="$REPO_ROOT/kubernetes/kargo/stage-dev.yaml"
@@ -81,9 +82,20 @@ if ! is_dry_run; then
     120
 fi
 
+# Register the immutable gate Application before the Warehouse can discover
+# Freight. This only reconciles its RBAC/ExternalSecret configuration; it does
+# not create an AnalysisRun, a fault, or a paid load Job.
+log_info "Applying immutable chaos-gate configuration"
+k8s_apply "${manifests[chaos_gate]}"
+if ! is_dry_run; then
+  wait_for "chaos-gate Application registration" \
+    "kubectl get application chaos-gate --namespace argocd >/dev/null" \
+    120
+fi
+
 # Warehouse polling comes last. It is the only resource in this phase that can
-# discover Freight; it cannot bypass the manual staging/prod policy or invoke
-# the not-yet-integrated chaos gate.
+# discover Freight; the manually promoted staging Stage now references the
+# complete gate, so Freight cannot become verified without its Job verdict.
 log_info "Applying Kargo Warehouse after destinations are registered"
 k8s_apply "${manifests[warehouse]}"
 

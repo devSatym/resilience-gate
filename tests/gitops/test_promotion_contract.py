@@ -38,11 +38,13 @@ def test_all_tokenized_promotion_resources_are_reviewed_renderer_outputs() -> No
     expected = {
         "kubernetes/kargo/credentials-git.yaml",
         "kubernetes/kargo/warehouse.yaml",
+        "kubernetes/kargo/analysistemplate.yaml",
         "kubernetes/kargo/stage-dev.yaml",
         "kubernetes/kargo/stage-staging.yaml",
         "kubernetes/kargo/stage-prod.yaml",
         "kubernetes/apps/appproject.yaml",
         "kubernetes/apps/applicationset.yaml",
+        "kubernetes/bootstrap/chaos-gate.yaml",
     }
     for path in expected:
         assert f'Path("{path}")' in source

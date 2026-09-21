@@ -1,0 +1,30 @@
+# Run `make render-config` before applying this public GitOps manifest. The
+# gate Application follows Chaos Mesh and the suspended loadgen template; it
+# declares no Workflow or paid Job by itself.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: chaos-gate
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: "{{GITHUB_REPOSITORY_URL}}"
+    targetRevision: main
+    path: kubernetes/chaos-experiments
+  destination:
+    server: https://kubernetes.default.svc
+    # AnalysisTemplate Jobs run in the Kargo project namespace; the staging
+    # RoleBinding explicitly grants only its target-namespace permissions.
+    namespace: resilience-gate
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

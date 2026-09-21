@@ -1,6 +1,6 @@
-# Staging accepts only Freight that has completed the development verification.
-# The later chaos gate is intentionally not referenced here until its scorer,
-# runner, and cleanup guarantees are implemented and reviewed.
+# Staging accepts only Freight that has completed development verification. A
+# manually requested staging promotion cannot become downstream Freight until
+# both in-cluster readiness and the immutable, bounded chaos gate pass.
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
@@ -80,6 +80,13 @@ spec:
   verification:
     analysisTemplates:
       - name: service-health
+      - name: chaos-gate
     args:
       - name: service-url
         value: http://url-shortener-${{ ctx.stage }}.url-shortener-${{ ctx.stage }}.svc.cluster.local
+      # Bind scorecards to exactly the Git source and immutable image Freight
+      # that rendered this staging revision; neither value comes from a tag.
+      - name: release-revision
+        value: ${{ commitFrom(vars.gitopsRepo).ID }}
+      - name: release-digest
+        value: ${{ imageFrom(vars.imageRepo).Digest }}

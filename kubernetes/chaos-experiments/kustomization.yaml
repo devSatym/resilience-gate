@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Cluster-side pieces of the chaos gate. Workflow and Python/shell code are
+# baked into the digest-pinned gate-runner image; this Kustomization never
+# generates a mutable scripts ConfigMap that could alter a reviewed verdict.
+# No global `namespace:` is used because RBAC spans the Kargo project and the
+# staging workload namespace.
+resources:
+  - chaos-gate-rbac.yaml
+  - external-secret-grafana.yaml

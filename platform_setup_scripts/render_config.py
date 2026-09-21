@@ -28,8 +28,10 @@ TEMPLATES = (
     Path("kubernetes/argocd/root-app.yaml"),
     Path("kubernetes/bootstrap/observability.yaml"),
     Path("kubernetes/bootstrap/chaos-jobs.yaml"),
+    Path("kubernetes/bootstrap/chaos-gate.yaml"),
     Path("kubernetes/kargo/credentials-git.yaml"),
     Path("kubernetes/kargo/warehouse.yaml"),
+    Path("kubernetes/kargo/analysistemplate.yaml"),
     Path("kubernetes/kargo/stage-dev.yaml"),
     Path("kubernetes/kargo/stage-staging.yaml"),
     Path("kubernetes/kargo/stage-prod.yaml"),
@@ -43,6 +45,13 @@ ZONE = re.compile(r"^[a-z]+-[a-z]+[0-9]-[a-z]$")
 DNS_LABEL = re.compile(r"^[a-z]([-a-z0-9]{0,38}[a-z0-9])?$")
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 BUCKET = re.compile(r"^[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]$")
+DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+# A syntactically valid but intentionally unresolvable digest prevents a fresh
+# lab bootstrap from becoming circular: the first gate image cannot be built in
+# the new private registry until the platform is up. An operator replaces this
+# sentinel with the signed CI digest, renders, reviews, and commits it before
+# requesting a staging promotion.
+UNRESOLVABLE_GATE_RUNNER_DIGEST = "sha256:" + "0" * 64
 
 
 class ConfigError(ValueError):
@@ -90,6 +99,7 @@ def make_context(values: dict[str, str]) -> dict[str, str]:
     cluster = values.get("CLUSTER_NAME", "resilience-gate").strip() or "resilience-gate"
     repository = values.get("GAR_REPO", "resilience-gate").strip() or "resilience-gate"
     bucket = values.get("TF_STATE_BUCKET", "").strip() or f"{project_id}-tf-state"
+    gate_runner_digest = values.get("GATE_RUNNER_DIGEST", "").strip() or UNRESOLVABLE_GATE_RUNNER_DIGEST
 
     if not PROJECT_ID.fullmatch(project_id):
         raise ConfigError("PROJECT_ID is not a valid GCP project ID")
@@ -103,6 +113,8 @@ def make_context(values: dict[str, str]) -> dict[str, str]:
         raise ConfigError("GAR_REPO is not a valid Artifact Registry repository ID")
     if not BUCKET.fullmatch(bucket):
         raise ConfigError("TF_STATE_BUCKET is not a valid GCS bucket name")
+    if not DIGEST.fullmatch(gate_runner_digest):
+        raise ConfigError("GATE_RUNNER_DIGEST must be a lowercase sha256 digest")
 
     owner, repo_name = github_repo.split("/", 1)
     return {
@@ -116,6 +128,7 @@ def make_context(values: dict[str, str]) -> dict[str, str]:
         "GITHUB_OWNER": owner,
         "GITHUB_REPOSITORY_URL": f"https://github.com/{github_repo}.git",
         "GITHUB_REPOSITORY_NAME": repo_name,
+        "GATE_RUNNER_DIGEST": gate_runner_digest,
     }
 
 

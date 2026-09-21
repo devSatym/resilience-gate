@@ -12,3 +12,11 @@ resources:
   # C064: GitOps registers only a suspended load generator; a manual runner
   # creates one-off testnet Jobs after explicit review.
   - chaos-jobs.yaml
+  # C089 integration correction: C074 defined these constrained Chaos Mesh
+  # resources, and the complete gate must make them reachable before it can
+  # ever create a bounded Workflow.
+  - chaos-mesh-ns-annotation.yaml
+  - chaos-mesh.yaml
+  # C089: the Application carries only immutable gate configuration. It is
+  # registered after observability, Chaos Mesh, and the suspended loadgen job.
+  - chaos-gate.yaml
