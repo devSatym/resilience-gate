@@ -37,6 +37,23 @@ while IFS= read -r -d '' shell_script; do
   bash -n "$shell_script"
 done < <(git ls-files -z -- '*.sh')
 
+# The promotion gate is intentionally testable without a cluster. Check that
+# its four baked inputs exist together before the gate-runner Docker build; no
+# validation step starts a Job, contacts Prometheus, or invokes testnet APIs.
+if [[ -f kubernetes/chaos-experiments/orchestrate.sh ]]; then
+  for gate_input in \
+    kubernetes/chaos-experiments/orchestrate.sh \
+    kubernetes/chaos-experiments/score_experiment.py \
+    kubernetes/chaos-experiments/annotate.py \
+    kubernetes/chaos-experiments/workflow.yaml; do
+    [[ -f "$gate_input" ]] || {
+      echo "missing required chaos-gate input: $gate_input" >&2
+      exit 1
+    }
+  done
+  bash -n kubernetes/chaos-experiments/orchestrate.sh
+fi
+
 # Render only Kustomizations that are actually committed. This keeps a local
 # worktree with future or experimental manifests from changing CI behavior.
 mapfile -d '' -t kustomizations < <(git ls-files -z -- 'kubernetes/**/kustomization.yaml')

@@ -53,3 +53,14 @@ jobs:
         run: python -m pytest signer/test_permit2.py tests/signer
       - name: Build signer image
         run: docker build --tag resilience-gate-signer:ci ./signer
+
+  gate-runner:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # The build context is the repository root because the runner bakes the
+      # reviewed scorer/orchestrator rather than mounting mutable scripts.
+      - name: Build immutable gate-runner image
+        run: docker build --tag resilience-gate-gate-runner:ci --file docker/gate-runner/Dockerfile .

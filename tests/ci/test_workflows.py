@@ -1,4 +1,4 @@
-"""Static contracts for credential-free validation and immutable delivery."""
+"""Static contracts for credential-free validation and ordered publication."""
 
 from __future__ import annotations
 
@@ -82,6 +82,14 @@ def test_validation_workflow_is_credential_free_and_has_platform_tooling() -> No
     assert "azure/setup-helm@v4" in raw
     assert "azure/setup-kubectl@v4" in raw
     assert parsed["permissions"] == {"contents": "read"}
+
+    gate_runner = parsed["jobs"]["gate-runner"]
+    assert "permissions" not in gate_runner
+    assert any(
+        step.get("run", "").startswith("docker build --tag resilience-gate-gate-runner:ci")
+        for step in gate_runner["steps"]
+        if isinstance(step, dict)
+    )
 
 
 def test_gate_runner_is_built_from_reviewed_scripts_not_a_runtime_configmap() -> None:
