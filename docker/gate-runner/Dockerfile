@@ -10,13 +10,15 @@ FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4d
 ARG KUBECTL_VERSION=v1.34.1
 ARG TARGETARCH
 
+# `timeout --foreground` from coreutils bounds scoring and cleanup before the
+# Job's active deadline can cut off exact-object cleanup.
 RUN set -eux; \
     case "${TARGETARCH:-amd64}" in \
       amd64|arm64) kubectl_arch="$TARGETARCH" ;; \
       *) echo "unsupported target architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     apt-get update; \
-    apt-get install --yes --no-install-recommends bash ca-certificates curl; \
+    apt-get install --yes --no-install-recommends bash ca-certificates coreutils curl; \
     curl --fail --silent --show-error --location \
       --output /usr/local/bin/kubectl \
       "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${kubectl_arch}/kubectl"; \

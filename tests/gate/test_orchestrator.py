@@ -35,7 +35,7 @@ def base_environment(tmp_path: Path, kubectl_body: str, **overrides: str) -> tup
         "WORKFLOW_FILE": str(scripts / "workflow.yaml"),
         "SCORECARD_DIR": str(tmp_path / "results"),
         "RUN_ID": "gate-test-2",
-        "RELEASE_REVISION": "rendered/staging@abc1234",
+        "RELEASE_REVISION": "abc1234",
         "RELEASE_DIGEST": "sha256:" + "b" * 64,
         "POLL_INTERVAL_SECONDS": "1",
     }

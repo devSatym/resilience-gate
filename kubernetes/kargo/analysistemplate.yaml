@@ -60,9 +60,10 @@ spec:
               app.kubernetes.io/part-of: resilience-gate
           spec:
             backoffLimit: 0
-            # The Workflow has a 660s hard deadline; leave time for bounded
-            # loadgen startup, three Prometheus scorecards, and verified cleanup.
-            activeDeadlineSeconds: 900
+            # 90s loadgen startup + 660s workflow + three 105s scorecards +
+            # 15s optional annotation + 120s verified cleanup + 60s reserve.
+            # The runner rejects a smaller local budget before it injects a fault.
+            activeDeadlineSeconds: 1320
             ttlSecondsAfterFinished: 86400
             template:
               metadata:
@@ -74,7 +75,9 @@ spec:
                 automountServiceAccountToken: true
                 enableServiceLinks: false
                 restartPolicy: Never
-                terminationGracePeriodSeconds: 30
+                # Allow the runner's bounded, exact cleanup trap to finish if
+                # Kubernetes terminates the Job at its active deadline.
+                terminationGracePeriodSeconds: 120
                 securityContext:
                   runAsNonRoot: true
                   runAsUser: 65532
@@ -106,6 +109,10 @@ spec:
                           secretKeyRef:
                             name: grafana-annotation
                             key: password
+                            # Grafana annotations are diagnostic only; a missing
+                            # optional ExternalSecret must not prevent the gate
+                            # container from starting and producing its verdict.
+                            optional: true
                     resources:
                       requests:
                         cpu: 100m

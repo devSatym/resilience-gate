@@ -994,7 +994,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--release-revision",
         default=os.environ.get("RELEASE_REVISION"),
-        help="rendered Git revision for the evaluated release",
+        help="source/Freight revision bound to the evaluated release",
     )
     parser.add_argument(
         "--release-digest",

@@ -26,7 +26,7 @@ def valid_postgres_reader(scorer, inject_at, scripted_reader, instant_evidence, 
 
 def release(scorer):
     return scorer.ReleaseIdentity(
-        revision="rendered/staging@7f3f2bb",
+        revision="7f3f2bb",
         image_digest="sha256:" + "a" * 64,
         run_id="chaos-gate-20261001-001",
     )
@@ -53,7 +53,7 @@ def test_scorecard_carries_release_identity_window_and_each_check(
     assert card.verdict == "pass"
     assert payload["schema_version"] == "resilience-gate.scorecard/v1"
     assert payload["release"] == {
-        "revision": "rendered/staging@7f3f2bb",
+        "revision": "7f3f2bb",
         "image_digest": "sha256:" + "a" * 64,
         "run_id": "chaos-gate-20261001-001",
     }
@@ -75,7 +75,7 @@ def test_release_identity_is_a_required_fail_closed_gate_check(
         client=valid_postgres_reader(
             scorer, inject_at, scripted_reader, instant_evidence, range_evidence
         ),
-        release=scorer.ReleaseIdentity(revision="rendered/staging", image_digest="latest", run_id=" "),
+        release=scorer.ReleaseIdentity(revision="7f3f2bb", image_digest="latest", run_id=" "),
         require_release_identity=True,
     )
 
@@ -84,6 +84,13 @@ def test_release_identity_is_a_required_fail_closed_gate_check(
     assert identity.verdict == "fail"
     assert identity.evidence_error == "invalid_release_identity"
     assert "digest" in identity.reason
+
+
+def test_cli_labels_release_revision_as_the_source_freight_identity(scorer) -> None:
+    source = Path(scorer.__file__).read_text(encoding="utf-8")
+
+    assert "source/Freight revision bound to the evaluated release" in source
+    assert "rendered Git revision for the evaluated release" not in source
 
 
 def test_scorecard_writer_emits_deterministic_valid_json(

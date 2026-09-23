@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://resilience-gate.example.invalid/schemas/run-metadata.schema.json",
+  "title": "Resilience Gate sanitized live-run metadata",
+  "description": "A non-secret, release-linked index for evidence collected from an explicitly approved owned testnet lab scenario.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "scenario",
+    "status",
+    "collected_at",
+    "repository_revision",
+    "chart_revision",
+    "release_image_digest",
+    "gate_runner_image_digest",
+    "signer_image_digest",
+    "loadgen_image_digest",
+    "namespace",
+    "cluster_context",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$"
+    },
+    "scenario": {
+      "enum": [
+        "baseline",
+        "chaos-gate",
+        "regression-blocked",
+        "recovery",
+        "prod-smoke"
+      ]
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "blocked",
+        "unavailable"
+      ]
+    },
+    "collected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "repository_revision": {
+      "description": "Source/Freight revision supplied to the gate, or unavailable when no claim is made.",
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{7,64}|unavailable)$"
+    },
+    "chart_revision": {
+      "description": "Rendered-branch revision observed after Kargo rendered the chart, or unavailable when no claim is made.",
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{7,64}|unavailable)$"
+    },
+    "release_image_digest": {
+      "description": "Immutable application image under verification, never a mutable tag.",
+      "type": "string",
+      "pattern": "^(?:sha256:[0-9a-f]{64}|unavailable)$"
+    },
+    "gate_runner_image_digest": {
+      "description": "Immutable gate-runner image that produced the verdict, or unavailable when no claim is made.",
+      "type": "string",
+      "pattern": "^(?:sha256:[0-9a-f]{64}|unavailable)$"
+    },
+    "signer_image_digest": {
+      "description": "Immutable signer runtime image observed by the scenario, or unavailable.",
+      "type": "string",
+      "pattern": "^(?:sha256:[0-9a-f]{64}|unavailable)$"
+    },
+    "loadgen_image_digest": {
+      "description": "Immutable load-generator runtime image observed by the scenario, or unavailable.",
+      "type": "string",
+      "pattern": "^(?:sha256:[0-9a-f]{64}|unavailable)$"
+    },
+    "namespace": {
+      "enum": [
+        "url-shortener-dev",
+        "url-shortener-staging",
+        "url-shortener-prod"
+      ]
+    },
+    "cluster_context": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[^\\n]+$"
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "redactions"
+      ],
+      "properties": {
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]*$"
+          }
+        },
+        "redactions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "credentials",
+              "secret-data",
+              "wallet-keys",
+              "authorization-headers",
+              "none"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scenario": {
+            "const": "baseline"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "namespace": {
+            "const": "url-shortener-dev"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scenario": {
+            "enum": [
+              "chaos-gate",
+              "regression-blocked",
+              "recovery"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "namespace": {
+            "const": "url-shortener-staging"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scenario": {
+            "const": "prod-smoke"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "namespace": {
+            "const": "url-shortener-prod"
+          }
+        }
+      }
+    }
+  ]
+}

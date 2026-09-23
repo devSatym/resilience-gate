@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "run_id": "invalid-secret-bearing-fixture",
+  "scenario": "chaos-gate",
+  "status": "fail",
+  "collected_at": "2026-10-01T00:00:00Z",
+  "repository_revision": "unavailable",
+  "chart_revision": "unavailable",
+  "release_image_digest": "unavailable",
+  "gate_runner_image_digest": "unavailable",
+  "signer_image_digest": "unavailable",
+  "loadgen_image_digest": "unavailable",
+  "namespace": "default",
+  "cluster_context": "unavailable",
+  "evidence": {
+    "files": ["status.txt"],
+    "redactions": ["credentials", "secret-data"]
+  }
+}

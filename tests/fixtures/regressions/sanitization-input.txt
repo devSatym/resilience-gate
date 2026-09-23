@@ -1,0 +1,3 @@
+Authorization: Bearer should-not-be-retained
+wallet_key=should-not-be-retained
+normal-status=healthy

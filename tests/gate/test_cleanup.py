@@ -78,7 +78,7 @@ exit 0
         "WORKFLOW_FILE": str(scripts / "workflow.yaml"),
         "SCORECARD_DIR": str(tmp_path / "results"),
         "RUN_ID": "gate-test-1",
-        "RELEASE_REVISION": "rendered/staging@abc1234",
+        "RELEASE_REVISION": "abc1234",
         "RELEASE_DIGEST": "sha256:" + "a" * 64,
         "POLL_INTERVAL_SECONDS": "1",
     }
@@ -163,3 +163,59 @@ def test_cleanup_windows_keep_the_workflow_within_its_hard_deadline() -> None:
     assert templates["postgres-recovery"]["deadline"] == "120s"
     assert templates["redis-recovery"]["deadline"] == "60s"
     assert templates["signer-recovery"]["deadline"] == "60s"
+
+
+def test_full_gate_budget_bounds_scoring_and_keeps_cleanup_ahead_of_lease_takeover() -> None:
+    """The Job cannot be killed before exact-object cleanup can run."""
+    source = ORCHESTRATOR.read_text(encoding="utf-8")
+    analysis_path = REPO_ROOT / "kubernetes" / "kargo" / "analysistemplate.yaml"
+    documents = list(yaml.safe_load_all(analysis_path.read_text(encoding="utf-8")))
+    gate = next(document for document in documents if document["metadata"]["name"] == "chaos-gate")
+    job = gate["spec"]["metrics"][0]["provider"]["job"]["spec"]
+    pod = job["template"]["spec"]
+
+    # One scorer can make at most six 15-second Prometheus requests. The
+    # runner gives each of the three scorers 105 seconds, then reserves time
+    # for non-fatal annotation and verified cleanup.
+    startup = 90
+    workflow = 660
+    scorer_count = 3
+    scorer_timeout = 105
+    annotation = 15
+    cleanup = 120
+    reserve = 60
+    expected_minimum = startup + workflow + scorer_count * scorer_timeout + annotation + cleanup + reserve
+
+    assert expected_minimum == 1260
+    assert job["activeDeadlineSeconds"] == 1320
+    assert job["activeDeadlineSeconds"] >= expected_minimum
+    assert pod["terminationGracePeriodSeconds"] >= cleanup
+    # Lease expiry happens only after the Job deadline plus more than the
+    # maximum graceful-cleanup window, preventing another run from taking over
+    # during cleanup.
+    assert 1470 > job["activeDeadlineSeconds"] + pod["terminationGracePeriodSeconds"]
+    assert 'readonly SCORER_TIMEOUT_SECONDS="${SCORER_TIMEOUT_SECONDS:-105}"' in source
+    assert 'readonly CLEANUP_TIMEOUT_SECONDS="${CLEANUP_TIMEOUT_SECONDS:-120}"' in source
+    assert 'readonly GATE_JOB_DEADLINE_SECONDS="${GATE_JOB_DEADLINE_SECONDS:-1320}"' in source
+    assert 'readonly LOCK_DURATION_SECONDS="${LOCK_DURATION_SECONDS:-1470}"' in source
+    assert '"$TIMEOUT_BIN" --foreground "${SCORER_TIMEOUT_SECONDS}s"' in source
+    assert "cleanup_kubectl()" in source
+
+
+def test_undersized_gate_budget_fails_before_the_runner_acquires_a_lease(tmp_path: Path) -> None:
+    env = fake_gate_environment(tmp_path) | {
+        "GATE_JOB_DEADLINE_SECONDS": "1259",
+    }
+
+    result = subprocess.run(
+        ["bash", str(ORCHESTRATOR)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "cannot cover startup, workflow, scoring, annotation, and cleanup" in result.stderr
+    assert not (tmp_path / "kubectl.calls").exists()

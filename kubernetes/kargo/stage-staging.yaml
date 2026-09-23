@@ -10,6 +10,14 @@ metadata:
     app.kubernetes.io/part-of: resilience-gate
     resilience-gate.io/scope: testnet-only
 spec:
+  # Verification runs outside the promotion template. Keep the Freight source
+  # identities in Stage scope so its commitFrom/imageFrom expressions resolve
+  # to the exact candidate being verified.
+  vars:
+    - name: gitopsRepo
+      value: "{{GITHUB_REPOSITORY_URL}}"
+    - name: imageRepo
+      value: "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener"
   requestedFreight:
     - origin:
         kind: Warehouse

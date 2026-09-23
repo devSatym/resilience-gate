@@ -13,6 +13,7 @@ readonly TARGET_SERVICE="${TARGET_SERVICE:-url-shortener-staging}"
 readonly LOADGEN_CRONJOB="${LOADGEN_CRONJOB:-loadgen}"
 readonly KUBECTL="${KUBECTL:-kubectl}"
 readonly SLEEP_BIN="${SLEEP_BIN:-sleep}"
+readonly TIMEOUT_BIN="${TIMEOUT_BIN:-timeout}"
 readonly GATE_SCRIPTS_DIR="${GATE_SCRIPTS_DIR:-/opt/chaos-gate}"
 readonly WORKFLOW_FILE="${WORKFLOW_FILE:-${GATE_SCRIPTS_DIR}/workflow.yaml}"
 readonly SCORECARD_DIR="${SCORECARD_DIR:-/results}"
@@ -20,13 +21,36 @@ readonly PROM_URL="${PROM_URL:-}"
 
 # The workflow itself is capped at 660 seconds: 90 seconds baseline, three
 # 60-second faults, and 120/60/60 second recovery windows. The runner may use
-# a shorter timeout in an offline test, but never a longer one.
+# a shorter timeout in an offline test, but never a longer one. The enclosing
+# Kargo Job and Lease must also cover loadgen start, fail-closed scoring,
+# non-fatal annotation, and verified cleanup; otherwise an active deadline
+# could kill the process before it removes its exact fault objects.
 readonly WORKFLOW_TIMEOUT_SECONDS="${WORKFLOW_TIMEOUT_SECONDS:-660}"
 readonly LOADGEN_STARTUP_TIMEOUT_SECONDS="${LOADGEN_STARTUP_TIMEOUT_SECONDS:-75}"
 readonly POLL_INTERVAL_SECONDS="${POLL_INTERVAL_SECONDS:-5}"
-readonly LOCK_DURATION_SECONDS="${LOCK_DURATION_SECONDS:-720}"
+readonly SCORER_TIMEOUT_SECONDS="${SCORER_TIMEOUT_SECONDS:-105}"
+readonly ANNOTATION_TIMEOUT_SECONDS="${ANNOTATION_TIMEOUT_SECONDS:-15}"
+readonly CLEANUP_TIMEOUT_SECONDS="${CLEANUP_TIMEOUT_SECONDS:-120}"
+readonly GATE_JOB_DEADLINE_SECONDS="${GATE_JOB_DEADLINE_SECONDS:-1320}"
+readonly LOCK_DURATION_SECONDS="${LOCK_DURATION_SECONDS:-1470}"
 readonly LOCK_NAME="${LOCK_NAME:-chaos-gate-runner}"
 readonly GATE_SELECTOR="resilience-gate.io/gate=chaos"
+
+readonly MAX_LOADGEN_STARTUP_SECONDS=90
+readonly MAX_WORKFLOW_SECONDS=660
+readonly PROMETHEUS_REQUEST_TIMEOUT_SECONDS=15
+readonly MAX_PROMETHEUS_QUERIES_PER_EXPERIMENT=6
+readonly EXPERIMENT_COUNT=3
+readonly MIN_SCORER_TIMEOUT_SECONDS=$((
+  PROMETHEUS_REQUEST_TIMEOUT_SECONDS * MAX_PROMETHEUS_QUERIES_PER_EXPERIMENT
+))
+readonly MAX_SCORING_SECONDS=$((EXPERIMENT_COUNT * SCORER_TIMEOUT_SECONDS))
+readonly GATE_JOB_SAFETY_BUFFER_SECONDS=60
+readonly LOCK_POST_JOB_BUFFER_SECONDS=150
+readonly MIN_GATE_JOB_BUDGET_SECONDS=$((
+  MAX_LOADGEN_STARTUP_SECONDS + MAX_WORKFLOW_SECONDS + MAX_SCORING_SECONDS +
+  ANNOTATION_TIMEOUT_SECONDS + CLEANUP_TIMEOUT_SECONDS + GATE_JOB_SAFETY_BUFFER_SECONDS
+))
 
 readonly RELEASE_REVISION="${RELEASE_REVISION:-}"
 readonly RELEASE_DIGEST="${RELEASE_DIGEST:-}"
@@ -38,6 +62,7 @@ WORKFLOW_NAME=""
 LOADGEN_JOB=""
 SCORER_RUN_ID=""
 LOCK_HELD=0
+CLEANUP_DEADLINE_EPOCH=0
 declare -a FAILED_EXPERIMENTS=()
 declare -A INJECTED_AT=()
 
@@ -61,19 +86,33 @@ now_epoch() {
 validate_settings() {
   local value
   for value in "$WORKFLOW_TIMEOUT_SECONDS" "$LOADGEN_STARTUP_TIMEOUT_SECONDS" \
-    "$POLL_INTERVAL_SECONDS" "$LOCK_DURATION_SECONDS"; do
+    "$POLL_INTERVAL_SECONDS" "$SCORER_TIMEOUT_SECONDS" \
+    "$ANNOTATION_TIMEOUT_SECONDS" "$CLEANUP_TIMEOUT_SECONDS" \
+    "$GATE_JOB_DEADLINE_SECONDS" "$LOCK_DURATION_SECONDS"; do
     is_positive_integer "$value" || fail "timeout values must be positive integers" || return 1
   done
-  (( WORKFLOW_TIMEOUT_SECONDS <= 660 )) || {
+  (( WORKFLOW_TIMEOUT_SECONDS <= MAX_WORKFLOW_SECONDS )) || {
     fail "WORKFLOW_TIMEOUT_SECONDS cannot exceed the 660 second workflow deadline"
     return 1
   }
-  (( LOADGEN_STARTUP_TIMEOUT_SECONDS <= 90 )) || {
+  (( LOADGEN_STARTUP_TIMEOUT_SECONDS <= MAX_LOADGEN_STARTUP_SECONDS )) || {
     fail "LOADGEN_STARTUP_TIMEOUT_SECONDS cannot exceed the baseline window"
     return 1
   }
-  (( LOCK_DURATION_SECONDS >= WORKFLOW_TIMEOUT_SECONDS + 60 )) || {
-    fail "LOCK_DURATION_SECONDS must outlast the workflow timeout and cleanup buffer"
+  (( SCORER_TIMEOUT_SECONDS >= MIN_SCORER_TIMEOUT_SECONDS )) || {
+    fail "SCORER_TIMEOUT_SECONDS must cover six 15-second Prometheus calls"
+    return 1
+  }
+  (( GATE_JOB_DEADLINE_SECONDS >= MIN_GATE_JOB_BUDGET_SECONDS )) || {
+    fail "GATE_JOB_DEADLINE_SECONDS cannot cover startup, workflow, scoring, annotation, and cleanup"
+    return 1
+  }
+  (( LOCK_DURATION_SECONDS >= GATE_JOB_DEADLINE_SECONDS + LOCK_POST_JOB_BUFFER_SECONDS )) || {
+    fail "LOCK_DURATION_SECONDS must outlast the complete gate Job and post-job cleanup buffer"
+    return 1
+  }
+  command -v "$TIMEOUT_BIN" >/dev/null 2>&1 || {
+    fail "TIMEOUT_BIN is required to bound scoring and cleanup"
     return 1
   }
   [[ "$RUN_ID" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
@@ -174,9 +213,19 @@ acquire_lock() {
   fail "expired gate Lease changed while taking over; retry after its holder finishes"
 }
 
+cleanup_kubectl() {
+  local remaining_seconds
+  remaining_seconds=$((CLEANUP_DEADLINE_EPOCH - $(now_epoch)))
+  (( remaining_seconds > 0 )) || {
+    log "!! cleanup deadline (${CLEANUP_TIMEOUT_SECONDS}s) expired before verified cleanup completed"
+    return 1
+  }
+  "$TIMEOUT_BIN" --foreground "${remaining_seconds}s" "$KUBECTL" "$@"
+}
+
 verify_absent() {
   local namespace="$1" kind="$2" name="$3"
-  if "$KUBECTL" -n "$namespace" get "$kind" "$name" >/dev/null 2>&1; then
+  if cleanup_kubectl -n "$namespace" get "$kind" "$name" >/dev/null 2>&1; then
     log "!! cleanup verification: $kind/$name still exists in $namespace"
     return 1
   fi
@@ -185,18 +234,20 @@ verify_absent() {
 
 cleanup() {
   local cleanup_failed=0 leftovers
+  CLEANUP_DEADLINE_EPOCH=$(( $(now_epoch) + CLEANUP_TIMEOUT_SECONDS ))
+  log ">> verified cleanup deadline: ${CLEANUP_TIMEOUT_SECONDS}s"
 
   # Delete exact objects we created. Never sweep a selector from a different
   # run: an unrecognised object is evidence worth blocking on, not deleting.
   if [[ -n "$WORKFLOW_NAME" ]]; then
     log ">> cleaning workflow $WORKFLOW_NAME"
-    "$KUBECTL" -n "$TARGET_NAMESPACE" delete workflow "$WORKFLOW_NAME" \
+    cleanup_kubectl -n "$TARGET_NAMESPACE" delete workflow "$WORKFLOW_NAME" \
       --ignore-not-found --wait=true >/dev/null 2>&1 || cleanup_failed=1
-    "$KUBECTL" -n "$TARGET_NAMESPACE" delete podchaos \
+    cleanup_kubectl -n "$TARGET_NAMESPACE" delete podchaos \
       -l "chaos-mesh.org/workflow=$WORKFLOW_NAME" --ignore-not-found --wait=true \
       >/dev/null 2>&1 || cleanup_failed=1
     verify_absent "$TARGET_NAMESPACE" workflow "$WORKFLOW_NAME" || cleanup_failed=1
-    leftovers=$("$KUBECTL" -n "$TARGET_NAMESPACE" get podchaos \
+    leftovers=$(cleanup_kubectl -n "$TARGET_NAMESPACE" get podchaos \
       -l "chaos-mesh.org/workflow=$WORKFLOW_NAME" -o name 2>/dev/null) || cleanup_failed=1
     [[ -z "${leftovers:-}" ]] || {
       log "!! cleanup verification: workflow-owned PodChaos still exists: $leftovers"
@@ -206,13 +257,13 @@ cleanup() {
 
   if [[ -n "$LOADGEN_JOB" ]]; then
     log ">> cleaning loadgen Job $LOADGEN_JOB"
-    "$KUBECTL" -n "$TARGET_NAMESPACE" delete job "$LOADGEN_JOB" \
+    cleanup_kubectl -n "$TARGET_NAMESPACE" delete job "$LOADGEN_JOB" \
       --ignore-not-found --wait=true >/dev/null 2>&1 || cleanup_failed=1
     verify_absent "$TARGET_NAMESPACE" job "$LOADGEN_JOB" || cleanup_failed=1
   fi
 
   if (( LOCK_HELD )); then
-    "$KUBECTL" -n "$CONTROL_NAMESPACE" delete lease "$LOCK_NAME" \
+    cleanup_kubectl -n "$CONTROL_NAMESPACE" delete lease "$LOCK_NAME" \
       --ignore-not-found --wait=true >/dev/null 2>&1 || cleanup_failed=1
     verify_absent "$CONTROL_NAMESPACE" lease "$LOCK_NAME" || cleanup_failed=1
     LOCK_HELD=0
@@ -380,7 +431,8 @@ score_experiments() {
       --scorecard-path "$scorecard_path"
     )
     [[ -n "$PROM_URL" ]] && command+=(--prom "$PROM_URL")
-    if ! "${command[@]}"; then
+    if ! "$TIMEOUT_BIN" --foreground "${SCORER_TIMEOUT_SECONDS}s" "${command[@]}"; then
+      log "!! scorer $scorer_name exceeded its ${SCORER_TIMEOUT_SECONDS}s bound or returned a failure"
       FAILED_EXPERIMENTS+=("$experiment")
       score_failed=1
     fi
@@ -404,9 +456,10 @@ annotate_verdict() {
     log ">> Grafana annotation helper is unavailable; skipping non-fatally"
     return 0
   fi
-  python3 "$GATE_SCRIPTS_DIR/annotate.py" --verdict "$verdict" \
-    --failed "$failed_csv" --start "$workflow_start" --end "$workflow_end" \
-    --workflow "$WORKFLOW_NAME" || log "!! Grafana annotation failed non-fatally"
+  "$TIMEOUT_BIN" --foreground "${ANNOTATION_TIMEOUT_SECONDS}s" \
+    python3 "$GATE_SCRIPTS_DIR/annotate.py" --verdict "$verdict" \
+      --failed "$failed_csv" --start "$workflow_start" --end "$workflow_end" \
+      --workflow "$WORKFLOW_NAME" || log "!! Grafana annotation failed non-fatally"
 }
 
 main() {

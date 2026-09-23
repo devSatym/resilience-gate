@@ -45,6 +45,7 @@ def test_staging_accepts_only_development_freight_and_requires_manual_promotion(
 
 def test_staging_renders_the_freight_digest_and_requires_the_immutable_chaos_gate() -> None:
     stage = load(STAGING_PATH)
+    stage_vars = {item["name"]: item["value"] for item in stage["spec"]["vars"]}
     template = stage["spec"]["promotionTemplate"]["spec"]
     steps = template["steps"]
     yaml_update = next(step for step in steps if step["uses"] == "yaml-update")
@@ -53,6 +54,13 @@ def test_staging_renders_the_freight_digest_and_requires_the_immutable_chaos_gat
     assert {update["key"]: update["value"] for update in updates} == {
         "image.repository": "${{ vars.imageRepo }}",
         "image.digest": "${{ imageFrom(vars.imageRepo).Digest }}",
+    }
+    # Kargo evaluates verification outside promotionTemplate. These two
+    # Freight source identifiers must therefore be defined at Stage scope, not
+    # only inside the promotion template that produced the rendered commit.
+    assert stage_vars == {
+        "gitopsRepo": "{{GITHUB_REPOSITORY_URL}}",
+        "imageRepo": "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener",
     }
     assert stage["spec"]["verification"] == {
         "analysisTemplates": [{"name": "service-health"}, {"name": "chaos-gate"}],
@@ -91,11 +99,33 @@ def test_chaos_gate_job_uses_a_digest_and_cannot_change_its_scripts_at_runtime()
     assert metric["count"] == 1
     assert metric["failureLimit"] == 0
     assert job["backoffLimit"] == 0
-    assert job["activeDeadlineSeconds"] == 900
+    assert job["activeDeadlineSeconds"] == 1320
     assert pod["serviceAccountName"] == "chaos-gate"
     assert pod["restartPolicy"] == "Never"
+    assert pod["terminationGracePeriodSeconds"] == 120
+    grafana_password = next(
+        env for env in container["env"] if env["name"] == "GRAFANA_PASSWORD"
+    )
+    assert grafana_password["valueFrom"]["secretKeyRef"] == {
+        "name": "grafana-annotation",
+        "key": "password",
+        "optional": True,
+    }
     assert container["image"].endswith("/gate-runner@{{GATE_RUNNER_DIGEST}}")
     assert "configMap" not in yaml.safe_dump(job)
+
+
+def test_rendered_templates_preserve_stage_verification_vars_and_optional_annotation_secret() -> None:
+    template_root = REPO_ROOT / "platform_setup_scripts" / "templates" / "kubernetes" / "kargo"
+    stage_template = (template_root / "stage-staging.yaml.tmpl").read_text(encoding="utf-8")
+    analysis_template = (template_root / "analysistemplate.yaml.tmpl").read_text(encoding="utf-8")
+
+    assert "spec:\n  # Verification runs outside the promotion template." in stage_template
+    assert "  vars:\n    - name: gitopsRepo" in stage_template
+    assert "    - name: imageRepo" in stage_template
+    assert "activeDeadlineSeconds: 1320" in analysis_template
+    assert "terminationGracePeriodSeconds: 120" in analysis_template
+    assert "optional: true" in analysis_template
 
 
 def test_complete_gate_resources_are_reachable_before_warehouse_discovery() -> None:
