@@ -23,7 +23,9 @@ Completed phases:
 
 `--render-config` writes public manifests and exits. Review and commit that
 diff before running any mutating phase. Promotion, paid load generation, and
-chaos verification remain explicitly deferred to their later contracts.
+chaos verification remain explicitly deferred to their later contracts. After
+phase 06, run 07-verify.sh separately for read-only status; it is not a
+bootstrap phase.
 EOF
 }
 

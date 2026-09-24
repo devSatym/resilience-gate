@@ -1,4 +1,4 @@
-.PHONY: test validate validate-platform config render-config bootstrap loadgen-plan smoke-local local-up local-down
+.PHONY: test validate validate-platform config render-config bootstrap verify lab-status lab-bootstrap-plan lab-destroy-plan loadgen-plan smoke-local local-up local-down
 
 PYTHON ?= python3
 
@@ -19,6 +19,18 @@ render-config:
 
 bootstrap:
 	./platform_setup_scripts/bootstrap.sh
+
+verify:
+	./platform_setup_scripts/07-verify.sh
+
+lab-status:
+	./scripts/lab-ops.sh status
+
+lab-bootstrap-plan:
+	./scripts/lab-ops.sh bootstrap-plan
+
+lab-destroy-plan:
+	./scripts/lab-ops.sh destroy-plan
 
 loadgen-plan:
 	./scripts/run-loadgen.sh --plan
