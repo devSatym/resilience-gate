@@ -1,0 +1,180 @@
+# Resilience Gate architecture
+
+**Status: repository design and source map, not live-environment evidence.**
+This document describes the contracts currently represented by the source and
+manifests. No cloud project, Kubernetes cluster, Radius testnet payment, chaos
+experiment, or production-like promotion has been executed to verify this
+architecture from this workspace.
+
+Resilience Gate is deliberately testnet-only. A directory or namespace called
+`prod` represents a production-like testnet boundary, never a mainnet or
+public-production release.
+
+## System intent
+
+The platform is designed to promote an immutable workload identity through
+reviewed environments only after the configured checks for that stage succeed.
+It separates four concerns:
+
+| Concern | Source contract | What it does not establish by itself |
+| --- | --- | --- |
+| Workload | `app/` implements a FastAPI URL shortener; `signer/` is a separate Permit2-signing boundary. | A running service, funded wallet, or settled payment. |
+| Delivery | Helm values accept digest-qualified image identities, while Kargo templates render environment branches. | That an image was built, signed, pushed, or reconciled. |
+| Verification | The chaos gate is a bounded Job/Workflow design that binds source and workload identity to scorecards. | That any fault ran safely or that its score passed. |
+| Evidence | `docs/evidence/` defines sanitized artifacts for a reviewed lab run. | A live result when the artifact directories are empty. |
+
+## Configured component map
+
+### Application and dependency behavior
+
+The URL-shortener chart declares the application alongside PostgreSQL and
+Redis dependencies. Its application process exposes a deliberately narrow
+health distinction:
+
+- `/livez` is process-only, so a dependency outage should not cause a
+  dependency-driven restart loop.
+- `/ready` checks PostgreSQL and checks Redis before the first successful
+  readiness result; it returns an unavailable response when those required
+  checks cannot be made.
+- `/metrics` exports Prometheus metrics for the application contract.
+
+When payment settings are complete, `POST /shorten` requires an x402 v2
+`PAYMENT-SIGNATURE`. The application constructs payment terms from deployment
+configuration, asks a configured facilitator to verify and settle the
+authorization, and persists a validated settlement transaction identifier
+with the new URL. An unavailable facilitator maps to an availability failure;
+malformed or rejected authorization does not create a URL. The separate signer
+process exposes a limited `POST /sign-permit2` API and keeps private keys out
+of the load client and application process. See
+[the payment contract](design/payment-contract.md) and
+[the x402 design note](design/x402-migration.md).
+
+These are code and chart contracts. They are not observations of a reachable
+database, cache, signer, facilitator, or chain.
+
+### Bootstrap, GitOps, and promotion configuration
+
+`platform_setup_scripts/` treats local `config.env` as ignored operator input.
+`render_config.py` renders public repository, project, registry, and cluster
+identifiers into reviewable manifests before any bootstrap phase is allowed to
+use them. The bootstrap scripts also define an exact Kubernetes-context check
+for mutating phases. Neither an ignored local file nor a rendered manifest is a
+provisioning record.
+
+The GitOps design has two paths:
+
+1. The Argo CD root application follows `main` for bootstrap resources such as
+   observability and the gate configuration.
+2. The ApplicationSet follows `env/dev`, `env/staging`, and `env/prod` for
+   rendered workload output. Those branches are Kargo outputs; they are not
+   inputs to the source-of-truth `main` branch.
+
+The Kargo Project is named `resilience-gate`. Its policy declares development
+as the only automatic stage, while staging and the production-like testnet
+stage require an explicit promotion. The Warehouse may discover a constrained
+`sha-*` tag, but stage templates render the Freight's OCI digest into the
+environment values. The `prod` Stage manifest also carries an explicit
+deferred-activation annotation; its presence is a configuration guard, not an
+activation or promotion record.
+
+### Observability configuration
+
+The local `helm/observability` chart pins Prometheus, Loki, and Alloy chart
+dependencies in its lock file. It configures a reviewed namespace allowlist of
+ServiceMonitors, Prometheus retention/storage, Loki single-binary filesystem
+storage, and Alloy Kubernetes API log discovery. The dashboards and log/metric
+targets are useful only after the chart is actually installed and its sources
+are producing data; a rendered dashboard does not prove collection or alerting
+works.
+
+### Bounded chaos verification design
+
+The staging stage references both service-health and chaos-gate analyses. The
+gate runner is designed to require a release revision and digest, acquire a
+run-scoped Lease, reject an absent ready target or another active run, start
+bounded load, create the constrained workflow, score its telemetry, and verify
+cleanup on exit. Its scorer treats empty, malformed, non-finite, insufficient,
+or stale telemetry as evidence failure rather than a healthy zero.
+
+The configured production-like stage instead uses post-deploy liveness and
+readiness checks after its upstream staging boundary. That separation is
+intentional: a post-deploy smoke check cannot replace a prior chaos-gate
+result. It also does not prove that either check has been executed.
+
+## Intended promotion path
+
+The following is a conceptual rendering of the repository configuration. It
+does not show a historical run or a deployed topology.
+
+```mermaid
+flowchart LR
+  source[Reviewed source on main] --> identity[Source revision + OCI digest]
+  identity --> warehouse[Kargo Warehouse discovery]
+  warehouse --> dev[dev: configured automatic policy]
+  dev --> devhealth[service-health analysis]
+  devhealth --> staging[staging: manual promotion]
+  staging --> stghealth[service health]
+  stghealth --> gate[bounded chaos gate]
+  gate --> prod[prod-like testnet: manual promotion]
+  prod --> smoke[post-deploy health smoke]
+
+  source --> render[rendered env branches]
+  render --> argo[Argo CD environment Applications]
+  argo --> workload[Digest-pinned workload manifests]
+
+  workload -. metrics and logs, when installed .-> observe[Prometheus / Loki / Grafana]
+  observe -. evidence for scorer .-> gate
+```
+
+Kargo's render step and Argo CD reconciliation are distinct controls. The
+former writes a digest-bound rendered revision; the latter applies the desired
+revision. Both identities must be recorded before a later live evidence claim
+can be reproduced.
+
+## Promotion failure modes
+
+| Failure or ambiguity | Design response in source | Remaining limit |
+| --- | --- | --- |
+| Public identifiers are absent, unrendered, or inconsistent. | The renderer and bootstrap preflight are designed to reject unresolved or unsafe input before mutation. | This has not been exercised against an operator account or cluster here. |
+| Current kube context is wrong. | Mutating bootstrap phases require the configured GKE context exactly. | Context checks do not prove that the target itself is safe or funded. |
+| A tag moves after candidate discovery. | The Warehouse discovers constrained tags, but stage templates use `imageFrom(...).Digest` for rendered workload identity. | A digest still needs a real build, signature verification, retention, and live record. |
+| An application process is alive while a dependency is unavailable. | Liveness and readiness are separate; readiness can remove an unready endpoint without asserting the process is dead. | Probe behavior is only source-tested until run in a cluster. |
+| Payment authorization is invalid or the facilitator is unavailable. | The app rejects invalid authorization and treats facilitator transport/response failure as unavailable rather than settled. | No facilitator or chain settlement has been observed for this repository. |
+| Telemetry is missing, stale, malformed, or non-finite. | The scorer fails closed rather than interpreting missing data as zero. | Dashboard/configuration rendering cannot validate actual scrape coverage. |
+| The chaos target is absent, an older run remains, or another run owns the Lease. | The orchestrator is designed to stop before fault injection. | No live target-selection or concurrency result is recorded. |
+| A workflow times out or cleanup cannot be verified. | The final result is forced to fail when run-scoped resources cannot be confirmed absent. | Delete requests and cleanup paths need a real lab exercise. |
+| A candidate is manually patched outside the normal path. | Evidence rules require source, render, image, gate, and runtime identities to agree. | Review discipline still matters; manifests cannot make an undocumented patch auditable. |
+| No owned testnet lab is available. | The correct release state is unavailable/not collected, not pass. | This is the current state of the repository evidence. |
+
+## Explicit trade-offs
+
+- **Fail closed over uninterrupted promotion.** Missing telemetry, a held Lease,
+  or cleanup uncertainty blocks a candidate. This increases investigation work
+  but avoids mistaking absence of data for resilience.
+- **Digest identity over tag convenience.** Digests improve traceability, while
+  discovery tags remain convenient. The cost is more identity handling and
+  retention discipline.
+- **Rendered branches over in-cluster Helm rendering.** A reviewed output can
+  be inspected independently of Argo CD, but it introduces a controller-owned
+  branch lifecycle that must not be merged back into `main`.
+- **Separate signer boundary over a simpler load client.** Isolating private
+  keys reduces their exposure surface, but adds startup/health dependencies to
+  the payment test path.
+- **Small, pinned observability deployment over high availability.** The chart
+  configuration favors a bounded testnet lab and local storage footprint. It
+  is not a high-availability or disaster-recovery design.
+- **Testnet-only scope over real monetary assurance.** The source may model a
+  payment flow without making a mainnet, custody, compliance, or production
+  availability claim.
+
+## Evidence required before a release claim
+
+Before the project can claim a verified release, a sanitized evidence record
+must connect the exact source revision, rendered revision, workload digest,
+signer and gate-runner digests where applicable, target context, test window,
+scorecards, and cleanup result. The evidence must come from an explicitly
+approved owned lab. See [evidence handling](evidence/README.md),
+[artifact identity](design/artifact-identity.md), and
+[the evidence status directories](evidence/).
+
+The current evidence directories record that these live facts are absent.
