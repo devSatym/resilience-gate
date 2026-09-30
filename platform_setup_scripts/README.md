@@ -63,3 +63,15 @@ gke_<PROJECT_ID>_<ZONE>_<CLUSTER_NAME>
 Terraform obtains that context after a successful apply and verifies it before
 later phases can use Helm or kubectl. A mismatched current context is a hard
 failure, not a warning or implicit override.
+
+## Verification status
+
+These scripts and their tests define a guarded bootstrap contract; they are not
+evidence that a project, cluster, controller, secret backend, or GitOps
+application has been created. This repository currently has no recorded cloud
+or Kubernetes execution. A rendered configuration diff, dry run, or local test
+does not establish a successful bootstrap or release.
+
+Keep live results in the sanitized [evidence
+directory](../docs/evidence/README.md), bound to the exact source and artifact
+identities exercised in an approved owned testnet lab.
