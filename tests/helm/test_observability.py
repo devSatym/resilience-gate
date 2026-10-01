@@ -144,5 +144,19 @@ def test_observability_retains_ssa_and_ignores_gke_deployment_status_field() -> 
                 "group": "apps",
                 "kind": "Deployment",
                 "jsonPointers": ["/status/terminatingReplicas"],
-            }
+            },
+            {
+                "group": "apps",
+                "kind": "StatefulSet",
+                "name": "observability-loki",
+                "jqPathExpressions": [
+                    ".spec.volumeClaimTemplates[]?.spec.volumeMode",
+                    ".spec.volumeClaimTemplates[]?.status",
+                ],
+            },
+            {
+                "group": "",
+                "kind": "Service",
+                "jsonPointers": ["/metadata/annotations/cloud.google.com~1neg"],
+            },
         ]

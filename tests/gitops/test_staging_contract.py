@@ -149,6 +149,27 @@ def test_complete_gate_resources_are_reachable_before_warehouse_discovery() -> N
         "name": "resilience-gate-secrets",
         "kind": "ClusterSecretStore",
     }
+    assert annotation_secret["spec"]["target"] == {
+        "name": "grafana-annotation",
+        "creationPolicy": "Owner",
+        "deletionPolicy": "Retain",
+        "template": {
+            "engineVersion": "v2",
+            "mergePolicy": "Replace",
+            "data": {"password": "{{ .password }}"},
+        },
+    }
+    assert annotation_secret["spec"]["data"] == [
+        {
+            "secretKey": "password",
+            "remoteRef": {
+                "key": "resilience-gate-grafana-admin-password",
+                "conversionStrategy": "Default",
+                "decodingStrategy": "None",
+                "metadataPolicy": "None",
+            },
+        }
+    ]
     assert bootstrap_script.index('k8s_apply "${manifests[chaos_gate]}"') < bootstrap_script.index(
         'k8s_apply "${manifests[warehouse]}"'
     )

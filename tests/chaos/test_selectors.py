@@ -43,6 +43,17 @@ def test_chaos_mesh_requires_an_explicit_staging_namespace_opt_in() -> None:
     assert application["spec"]["source"]["repoURL"] == "https://charts.chaos-mesh.org"
     assert application["spec"]["source"]["chart"] == "chaos-mesh"
     assert application["spec"]["source"]["targetRevision"] == "2.8.2"
+    assert application["spec"]["syncPolicy"]["syncOptions"] == [
+        "CreateNamespace=true",
+        "ServerSideApply=true",
+    ]
+    assert application["spec"]["ignoreDifferences"] == [
+        {
+            "group": "apps",
+            "kind": "Deployment",
+            "jsonPointers": ["/status/terminatingReplicas"],
+        }
+    ]
 
     values = yaml.safe_load(application["spec"]["source"]["helm"]["values"])
     assert values["enableProfiling"] is False

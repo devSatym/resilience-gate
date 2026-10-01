@@ -11,6 +11,14 @@ metadata:
     argocd.argoproj.io/sync-wave: "3"
 spec:
   project: default
+  # GKE 1.35 adds this status field after the controller Deployment is
+  # created. Ignore it before Argo CD's server-side-apply diff parses live
+  # resources; SSA remains necessary for Chaos Mesh Workflow CRDs.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
   source:
     repoURL: https://charts.chaos-mesh.org
     chart: chaos-mesh
