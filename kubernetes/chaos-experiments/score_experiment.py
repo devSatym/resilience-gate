@@ -565,9 +565,10 @@ POSTGRES_CHECKS = (
     ),
     CheckDefinition(
         identifier="postgres-outage-observed",
-        name="the PostgreSQL dependency was observed unavailable",
+        name="the PostgreSQL target was observed unavailable",
         expression=(
-            'min(url_shortener_dependency_up{{namespace="{namespace}", dependency="postgres"}})'
+            'min(kube_pod_status_ready{{namespace="{namespace}", condition="true", '
+            'pod="url-shortener-staging-postgresql-0"}})'
         ),
         query_kind="range",
         aggregation="min",
@@ -577,9 +578,10 @@ POSTGRES_CHECKS = (
     ),
     CheckDefinition(
         identifier="postgres-recovered",
-        name="the application observed PostgreSQL recovery before the window ended",
+        name="the PostgreSQL target recovered before the window ended",
         expression=(
-            'min(url_shortener_dependency_up{{namespace="{namespace}", dependency="postgres"}})'
+            'min(kube_pod_status_ready{{namespace="{namespace}", condition="true", '
+            'pod="url-shortener-staging-postgresql-0"}})'
         ),
         query_kind="range",
         aggregation="last",
@@ -659,8 +661,11 @@ REDIS_CHECKS = (
     ),
     CheckDefinition(
         identifier="redis-outage-observed",
-        name="the Redis dependency was observed unavailable",
-        expression='min(url_shortener_dependency_up{{namespace="{namespace}", dependency="redis"}})',
+        name="the Redis target was observed unavailable",
+        expression=(
+            'min(kube_pod_status_ready{{namespace="{namespace}", condition="true", '
+            'pod="url-shortener-staging-redis-master-0"}})'
+        ),
         query_kind="range",
         aggregation="min",
         operator="==",
@@ -669,8 +674,11 @@ REDIS_CHECKS = (
     ),
     CheckDefinition(
         identifier="redis-recovered",
-        name="the application observed Redis recovery before the window ended",
-        expression='min(url_shortener_dependency_up{{namespace="{namespace}", dependency="redis"}})',
+        name="the Redis target recovered before the window ended",
+        expression=(
+            'min(kube_pod_status_ready{{namespace="{namespace}", condition="true", '
+            'pod="url-shortener-staging-redis-master-0"}})'
+        ),
         query_kind="range",
         aggregation="last",
         operator="==",
@@ -685,8 +693,11 @@ REDIS_CHECKS = (
 SIGNER_CHECKS = (
     CheckDefinition(
         identifier="signer-outage-observed",
-        name="the signer readiness metric was observed unavailable",
-        expression='min(signer_ready{{namespace="{namespace}"}})',
+        name="the signer target was observed unavailable",
+        expression=(
+            'min(kube_pod_status_ready{{namespace="{namespace}", condition="true", '
+            'pod=~"radius-signer-[a-z0-9]+-[a-z0-9]+"}})'
+        ),
         query_kind="range",
         aggregation="min",
         operator="==",
@@ -695,8 +706,11 @@ SIGNER_CHECKS = (
     ),
     CheckDefinition(
         identifier="signer-recovered",
-        name="the signer became ready again before the observation window ended",
-        expression='min(signer_ready{{namespace="{namespace}"}})',
+        name="the signer target recovered before the observation window ended",
+        expression=(
+            'min(kube_pod_status_ready{{namespace="{namespace}", condition="true", '
+            'pod=~"radius-signer-[a-z0-9]+-[a-z0-9]+"}})'
+        ),
         query_kind="range",
         aggregation="last",
         operator="==",

@@ -87,3 +87,16 @@ def test_redis_query_template_preserves_the_route_label_literal(scorer) -> None:
     assert 'namespace="url-shortener-staging"' in expression
     assert 'handler="/{code}"' in expression
     assert "{namespace}" not in expression
+
+
+def test_redis_outage_queries_use_the_exact_target_readiness_series(scorer) -> None:
+    outage, recovery = scorer.REDIS_CHECKS[4:6]
+    window = scorer.make_window("2026-10-01T12:00:00Z", 60, 60)
+
+    for check in (outage, recovery):
+        expression = scorer.render_expression(
+            check, namespace="url-shortener-staging", window=window
+        )
+        assert "kube_pod_status_ready" in expression
+        assert 'pod="url-shortener-staging-redis-master-0"' in expression
+        assert "url_shortener_dependency_up" not in expression

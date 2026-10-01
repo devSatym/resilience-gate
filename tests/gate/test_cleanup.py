@@ -27,7 +27,17 @@ def fake_gate_environment(
     scripts = tmp_path / "scripts"
     scripts.mkdir()
     (scripts / "workflow.yaml").write_text("apiVersion: v1\nkind: ConfigMap\n", encoding="utf-8")
-    (scripts / "score_experiment.py").write_text("raise SystemExit(1)\n", encoding="utf-8")
+    score_calls = tmp_path / "score.calls"
+    (scripts / "score_experiment.py").write_text(
+        """import os
+import sys
+
+with open(os.environ["SCORE_CALLS"], "a", encoding="utf-8") as handle:
+    handle.write(sys.argv[sys.argv.index("--inject-at") + 1] + "\\n")
+raise SystemExit(1)
+""",
+        encoding="utf-8",
+    )
     (scripts / "annotate.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
 
     state = tmp_path / "state"
@@ -69,7 +79,19 @@ if [[ "$args" == *" get workflow chaos-gate-run-1 "* ]]; then
 fi
 if [[ "$args" == *" get workflownode "* ]]; then
   {node_visibility_guard}
-  printf 'postgres\\t2026-10-01T12:01:30Z\\nredis\\t2026-10-01T12:04:30Z\\nsigner\\t2026-10-01T12:06:30Z\\n'
+  printf 'postgres\\tchaos-mesh.org\\tPodChaos\\tpostgres-chaos\\nredis\\tchaos-mesh.org\\tPodChaos\\tredis-chaos\\nsigner\\tchaos-mesh.org\\tPodChaos\\tsigner-chaos\\n'
+  exit 0
+fi
+if [[ "$args" == *" get podchaos postgres-chaos "* ]]; then
+  printf 'Failed\\tApply\\t2026-10-01T12:01:29Z\\nSucceeded\\tApply\\t2026-10-01T12:01:31Z\\nSucceeded\\tRecover\\t2026-10-01T12:02:31Z\\n'
+  exit 0
+fi
+if [[ "$args" == *" get podchaos redis-chaos "* ]]; then
+  printf 'Succeeded\\tApply\\t2026-10-01T12:04:31Z\\n'
+  exit 0
+fi
+if [[ "$args" == *" get podchaos signer-chaos "* ]]; then
+  printf 'Succeeded\\tApply\\t2026-10-01T12:06:31Z\\n'
   exit 0
 fi
 if [[ "$args" == *" delete workflow chaos-gate-run-1 "* ]]; then touch {state}/workflow-deleted; exit 0; fi
@@ -90,6 +112,7 @@ exit 0
         "GATE_SCRIPTS_DIR": str(scripts),
         "WORKFLOW_FILE": str(scripts / "workflow.yaml"),
         "SCORECARD_DIR": str(tmp_path / "results"),
+        "SCORE_CALLS": str(score_calls),
         "RUN_ID": "gate-test-1",
         "RELEASE_REVISION": "abc1234",
         "RELEASE_DIGEST": "sha256:" + "a" * 64,
@@ -136,8 +159,8 @@ def test_pre_annotation_runner_still_preserves_the_gate_verdict(tmp_path: Path) 
     assert "annotation helper is unavailable; skipping non-fatally" in result.stderr
 
 
-def test_collects_workflow_node_timestamps_before_terminal_gc(tmp_path: Path) -> None:
-    """Scorecards retain fault timestamps even after Chaos Mesh removes nodes."""
+def test_collects_applied_fault_timestamps_before_terminal_gc(tmp_path: Path) -> None:
+    """Scorecards retain actual Apply events even after Chaos Mesh removes nodes."""
     result = subprocess.run(
         ["bash", str(ORCHESTRATOR)],
         env=fake_gate_environment(tmp_path, workflow_nodes_disappear_on_completion=True),
@@ -147,12 +170,28 @@ def test_collects_workflow_node_timestamps_before_terminal_gc(tmp_path: Path) ->
         check=False,
     )
 
-    # The fixture's scorer intentionally fails, but a missing timestamp must
-    # not be the cause after the Workflow transitions to terminal.
+    # The fixture's scorer intentionally fails, but it must receive the exact
+    # successful Apply timestamps captured before the Workflow is terminal.
     assert result.returncode == 1
-    assert "workflow did not expose a start time" not in result.stderr
+    assert "workflow did not expose a successful Apply timestamp" not in result.stderr
+    assert (tmp_path / "score.calls").read_text(encoding="utf-8").splitlines() == [
+        "2026-10-01T12:01:31Z",
+        "2026-10-01T12:04:31Z",
+        "2026-10-01T12:06:31Z",
+    ]
     calls = (tmp_path / "kubectl.calls").read_text(encoding="utf-8")
     assert calls.count("get workflownode") >= 2
+
+
+def test_workflow_timestamp_jsonpaths_use_real_tab_and_newline_delimiters() -> None:
+    source = ORCHESTRATOR.read_text(encoding="utf-8")
+    start = source.index("collect_injection_times()")
+    collector = source[start : source.index("\n}\n", start) + 2]
+
+    assert r'{"\t"}' in collector
+    assert r'{"\n"}' in collector
+    assert r'{"\\t"}' not in collector
+    assert r'{"\\n"}' not in collector
 
 
 def test_lock_and_target_permissions_match_the_orchestrator_contract() -> None:

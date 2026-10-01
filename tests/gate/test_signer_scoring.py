@@ -75,3 +75,16 @@ def test_signer_gate_rejects_app_isolation_regressions(
 
     failures = {check.identifier for check in card.checks if check.verdict == "fail"}
     assert failures == {"app-restarts", "app-5xx", "payment-replays"}
+
+
+def test_signer_outage_queries_use_the_deployed_target_readiness_series(scorer) -> None:
+    outage, recovery = scorer.SIGNER_CHECKS[:2]
+    window = scorer.make_window("2026-10-01T12:00:00Z", 60, 60)
+
+    for check in (outage, recovery):
+        expression = scorer.render_expression(
+            check, namespace="url-shortener-staging", window=window
+        )
+        assert "kube_pod_status_ready" in expression
+        assert 'pod=~"radius-signer-[a-z0-9]+-[a-z0-9]+"' in expression
+        assert "signer_ready" not in expression

@@ -377,9 +377,9 @@ wait_for_workflow() {
   local deadline conditions
   deadline=$(( $(now_epoch) + WORKFLOW_TIMEOUT_SECONDS ))
   while :; do
-    # Chaos Mesh removes WorkflowNodes as the Workflow reaches a terminal
-    # state. Preserve each fault's durable start time while the Workflow is
-    # still running, so post-workflow scorecards do not lose their evidence.
+    # Chaos Mesh removes WorkflowNodes and their child PodChaos resources as
+    # the Workflow reaches a terminal state. Preserve each actual Apply event
+    # while the Workflow is still running, so scorecards retain fault evidence.
     collect_injection_times || return 1
     conditions=$("$KUBECTL" -n "$TARGET_NAMESPACE" get workflow "$WORKFLOW_NAME" \
       -o jsonpath='{range .status.conditions[*]}{.type}={.status}{" "}{end}' \
@@ -398,17 +398,34 @@ wait_for_workflow() {
 }
 
 collect_injection_times() {
-  local rows template_name inject_at
+  local rows template_name api_group kind chaos_name
+  local event_rows event_type event_operation event_at
   rows=$("$KUBECTL" -n "$TARGET_NAMESPACE" get workflownode \
     -l "chaos-mesh.org/workflow=$WORKFLOW_NAME" \
-    -o jsonpath='{range .items[*]}{.spec.templateName}{"\\t"}{.spec.startTime}{"\\n"}{end}' \
+    -o jsonpath='{range .items[*]}{.spec.templateName}{"\t"}{.status.chaosResource.apiGroup}{"\t"}{.status.chaosResource.kind}{"\t"}{.status.chaosResource.name}{"\n"}{end}' \
     2>/dev/null) || {
-      fail "could not retrieve workflow node start times"
+      fail "could not retrieve workflow node chaos references"
       return 1
     }
-  while IFS=$'\t' read -r template_name inject_at; do
-    [[ -n "$template_name" && -n "$inject_at" ]] || continue
-    INJECTED_AT["$template_name"]="$inject_at"
+  while IFS=$'\t' read -r template_name api_group kind chaos_name; do
+    case "$template_name" in
+      postgres|redis|signer) ;;
+      *) continue ;;
+    esac
+    [[ "$api_group" == "chaos-mesh.org" && "$kind" == "PodChaos" && -n "$chaos_name" ]] || continue
+
+    # A WorkflowNode's startTime is when its controller rendered the node,
+    # not proof that Chaos Mesh changed a target. Score only from the earliest
+    # successful Apply event on its exact typed child resource.
+    event_rows=$("$KUBECTL" -n "$TARGET_NAMESPACE" get podchaos "$chaos_name" \
+      -o jsonpath='{range .status.experiment.containerRecords[*]}{range .events[*]}{.type}{"\t"}{.operation}{"\t"}{.timestamp}{"\n"}{end}{end}' \
+      2>/dev/null) || continue
+    while IFS=$'\t' read -r event_type event_operation event_at; do
+      [[ "$event_type" == "Succeeded" && "$event_operation" == "Apply" && -n "$event_at" ]] || continue
+      if [[ -z "${INJECTED_AT[$template_name]:-}" || "$event_at" < "${INJECTED_AT[$template_name]}" ]]; then
+        INJECTED_AT["$template_name"]="$event_at"
+      fi
+    done <<<"$event_rows"
   done <<<"$rows"
 }
 
@@ -420,7 +437,7 @@ score_experiments() {
     scorer_name="${experiment}-pod-failure"
     inject_at="${INJECTED_AT[$experiment]:-}"
     if [[ -z "$inject_at" ]]; then
-      log "!! workflow did not expose a start time for $experiment"
+      log "!! workflow did not expose a successful Apply timestamp for $experiment"
       FAILED_EXPERIMENTS+=("$experiment")
       score_failed=1
       continue

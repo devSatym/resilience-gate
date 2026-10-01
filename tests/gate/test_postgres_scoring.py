@@ -44,6 +44,19 @@ def test_postgresql_positive_control_requires_traffic_outage_and_recovery(
     assert any("[120s]" in expression for _, expression in reader.queries)
 
 
+def test_postgresql_outage_queries_use_the_exact_target_readiness_series(scorer) -> None:
+    outage, recovery = scorer.POSTGRES_CHECKS[2:4]
+    window = scorer.make_window("2026-10-01T12:00:00Z", 60, 60)
+
+    for check in (outage, recovery):
+        expression = scorer.render_expression(
+            check, namespace="url-shortener-staging", window=window
+        )
+        assert "kube_pod_status_ready" in expression
+        assert 'pod="url-shortener-staging-postgresql-0"' in expression
+        assert "url_shortener_dependency_up" not in expression
+
+
 def test_postgresql_gate_rejects_a_fault_that_never_landed(
     scorer, inject_at, scripted_reader, instant_evidence, range_evidence
 ) -> None:
