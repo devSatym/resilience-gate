@@ -87,7 +87,7 @@ spec:
                     type: RuntimeDefault
                 containers:
                   - name: chaos-gate
-                    image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/gate-runner@sha256:40144e7c6508dbb492ca1121acaae53bdc465c1a078098daa02144ba39c6912b"
+                    image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/gate-runner@sha256:0f6da45288de7f3d90ae4a9ac1d1d462ab43b5f8d807ba0c0682798f857992b4"
                     imagePullPolicy: IfNotPresent
                     env:
                       - name: RUN_ID
