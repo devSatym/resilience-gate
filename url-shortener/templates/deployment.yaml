@@ -54,7 +54,9 @@ spec:
               drop:
               - ALL
             readOnlyRootFilesystem: true
+            runAsGroup: 10001
             runAsNonRoot: true
+            runAsUser: 10001
           ports:
             - name: http
               containerPort: 8000
