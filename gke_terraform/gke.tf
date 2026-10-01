@@ -17,9 +17,8 @@ resource "google_container_cluster" "gke_cluster" {
   node_config {
     service_account = google_service_account.gke_nodes.email
 
-    # The provider otherwise serializes an empty logging variant object for the
-    # transient initial pool. GKE rejects that zero-value enum at cluster
-    # creation, so declare the documented default explicitly.
+    # Avoid serializing an empty logging variant object for the transient
+    # initial pool by declaring GKE's documented default explicitly.
     logging_variant = "DEFAULT"
   }
 
