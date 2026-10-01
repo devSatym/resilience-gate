@@ -9,6 +9,9 @@ resources:
   # metric-driven gates are introduced.
   - observability.yaml
   - secrets/external-secrets-monitoring.yaml
+  # Dev and prod are explicit bootstrap-owned destinations. Staging is the
+  # separately annotated Chaos Mesh namespace below.
+  - workload-namespaces.yaml
   # C064: GitOps registers only a suspended load generator; a manual runner
   # creates one-off testnet Jobs after explicit review.
   - chaos-jobs.yaml

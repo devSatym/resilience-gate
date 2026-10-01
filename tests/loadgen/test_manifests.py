@@ -41,7 +41,10 @@ def test_signer_uses_its_own_secret_boundary_and_safe_probes() -> None:
     pod = deployment["spec"]["template"]["spec"]
     container = pod["containers"][0]
 
-    assert DIGEST.search(container["image"])
+    assert container["image"] == (
+        "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/"
+        "radius-signer@{{SIGNER_DIGEST}}"
+    )
     assert ":latest" not in container["image"]
     assert "ajprojectplatform" not in container["image"]
     assert pod["automountServiceAccountToken"] is False
@@ -82,9 +85,10 @@ def test_external_secret_contract_never_gives_loadgen_payer_keys() -> None:
 
     for external_secret in (signer, loadgen):
         assert all(
-            item["remoteRef"]["key"].startswith("resilience-gate/staging/")
+            item["remoteRef"]["key"].startswith("resilience-gate-staging-")
             for item in external_secret["spec"]["data"]
         )
+        assert all("/" not in item["remoteRef"]["key"] for item in external_secret["spec"]["data"])
 
 
 def test_suspended_loadgen_is_digest_pinned_and_exports_a_summary() -> None:

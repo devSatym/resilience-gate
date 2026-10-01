@@ -50,8 +50,8 @@ externalSecrets:
   target:
     name: url-shortener-prod-credentials
   remoteRefs:
-    databaseUrlKey: resilience-gate/prod/url-shortener-database-url
-    databasePasswordKey: resilience-gate/prod/url-shortener-database-password
-    redisUrlKey: resilience-gate/prod/url-shortener-redis-url
-    redisPasswordKey: resilience-gate/prod/url-shortener-redis-password
-    serviceWalletAddressKey: resilience-gate/prod/service-wallet-address-testnet
+    databaseUrlKey: resilience-gate-prod-url-shortener-database-url
+    databasePasswordKey: resilience-gate-prod-url-shortener-database-password
+    redisUrlKey: resilience-gate-prod-url-shortener-redis-url
+    redisPasswordKey: resilience-gate-prod-url-shortener-redis-password
+    serviceWalletAddressKey: resilience-gate-prod-service-wallet-address-testnet

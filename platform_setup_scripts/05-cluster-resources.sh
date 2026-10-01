@@ -9,8 +9,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 load_config
 
+require_deployable_signer_digest() {
+  local unresolvable_digest="sha256:$(printf '%064d' 0)"
+
+  if [ -z "${SIGNER_DIGEST:-}" ]; then
+    log_err "SIGNER_DIGEST is required before Phase 05 can reconcile root GitOps"
+    exit 1
+  fi
+  if ! [[ "$SIGNER_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    log_err "SIGNER_DIGEST must be a lowercase sha256 digest before Phase 05"
+    exit 1
+  fi
+  if [ "$SIGNER_DIGEST" = "$unresolvable_digest" ]; then
+    log_err "SIGNER_DIGEST is the unresolvable sentinel; publish and configure the signed signer artifact before Phase 05"
+    exit 1
+  fi
+}
+
 log_step "Phase 05 — cluster resources and root GitOps application"
 require_env PROJECT_ID
+
+# Phase 05 registers root-app, which can immediately reconcile the signer
+# Deployment. Keep the renderer's safe zero-digest bootstrap sentinel out of
+# every mutating root-GitOps path. Earlier infrastructure phases can still
+# provision GAR and OIDC so CI can publish the first real signer artifact.
+if ! is_dry_run; then
+  require_deployable_signer_digest
+fi
 
 if is_dry_run; then
   log_info "Dry run: target Kubernetes context is not queried"

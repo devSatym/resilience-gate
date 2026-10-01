@@ -143,8 +143,8 @@ externalSecrets:
     name: ""
     creationPolicy: Owner
   remoteRefs:
-    databaseUrlKey: resilience-gate/shared/url-shortener-database-url
-    databasePasswordKey: resilience-gate/shared/url-shortener-database-password
-    redisUrlKey: resilience-gate/shared/url-shortener-redis-url
-    redisPasswordKey: resilience-gate/shared/url-shortener-redis-password
-    serviceWalletAddressKey: resilience-gate/shared/service-wallet-address-testnet
+    databaseUrlKey: resilience-gate-shared-url-shortener-database-url
+    databasePasswordKey: resilience-gate-shared-url-shortener-database-password
+    redisUrlKey: resilience-gate-shared-url-shortener-redis-url
+    redisPasswordKey: resilience-gate-shared-url-shortener-redis-password
+    serviceWalletAddressKey: resilience-gate-shared-service-wallet-address-testnet

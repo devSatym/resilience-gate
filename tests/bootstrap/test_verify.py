@@ -123,6 +123,8 @@ def test_verifier_shell_and_source_contract_are_read_only() -> None:
     source = VERIFY.read_text(encoding="utf-8")
     assert "require_target_context" in source
     assert "--scope" in source
+    for namespace in ("url-shortener-dev", "url-shortener-staging", "url-shortener-prod"):
+        assert f'check "Namespace/{namespace} exists" namespace_exists {namespace}' in source
     for forbidden in (
         "kubectl apply",
         "kubectl create",

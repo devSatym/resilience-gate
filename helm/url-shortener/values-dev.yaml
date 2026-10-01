@@ -46,8 +46,8 @@ externalSecrets:
   target:
     name: url-shortener-dev-credentials
   remoteRefs:
-    databaseUrlKey: resilience-gate/dev/url-shortener-database-url
-    databasePasswordKey: resilience-gate/dev/url-shortener-database-password
-    redisUrlKey: resilience-gate/dev/url-shortener-redis-url
-    redisPasswordKey: resilience-gate/dev/url-shortener-redis-password
-    serviceWalletAddressKey: resilience-gate/dev/service-wallet-address-testnet
+    databaseUrlKey: resilience-gate-dev-url-shortener-database-url
+    databasePasswordKey: resilience-gate-dev-url-shortener-database-password
+    redisUrlKey: resilience-gate-dev-url-shortener-redis-url
+    redisPasswordKey: resilience-gate-dev-url-shortener-redis-password
+    serviceWalletAddressKey: resilience-gate-dev-service-wallet-address-testnet

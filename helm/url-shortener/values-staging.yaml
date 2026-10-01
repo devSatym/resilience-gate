@@ -45,8 +45,8 @@ externalSecrets:
   target:
     name: url-shortener-staging-credentials
   remoteRefs:
-    databaseUrlKey: resilience-gate/staging/url-shortener-database-url
-    databasePasswordKey: resilience-gate/staging/url-shortener-database-password
-    redisUrlKey: resilience-gate/staging/url-shortener-redis-url
-    redisPasswordKey: resilience-gate/staging/url-shortener-redis-password
-    serviceWalletAddressKey: resilience-gate/staging/service-wallet-address-testnet
+    databaseUrlKey: resilience-gate-staging-url-shortener-database-url
+    databasePasswordKey: resilience-gate-staging-url-shortener-database-password
+    redisUrlKey: resilience-gate-staging-url-shortener-redis-url
+    redisPasswordKey: resilience-gate-staging-url-shortener-redis-password
+    serviceWalletAddressKey: resilience-gate-staging-service-wallet-address-testnet

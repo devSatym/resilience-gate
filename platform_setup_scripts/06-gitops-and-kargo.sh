@@ -30,6 +30,7 @@ declare -A manifests=(
   [project_config]="$REPO_ROOT/kubernetes/kargo/projectconfig.yaml"
   [analysis]="$REPO_ROOT/kubernetes/kargo/analysistemplate.yaml"
   [chaos_gate]="$REPO_ROOT/kubernetes/bootstrap/chaos-gate.yaml"
+  [workload_namespaces]="$REPO_ROOT/kubernetes/bootstrap/workload-namespaces.yaml"
   [app_project]="$REPO_ROOT/kubernetes/apps/appproject.yaml"
   [app_set]="$REPO_ROOT/kubernetes/apps/applicationset.yaml"
   [dev]="$REPO_ROOT/kubernetes/kargo/stage-dev.yaml"
@@ -69,6 +70,12 @@ k8s_apply "${manifests[analysis]}"
 k8s_apply "${manifests[dev]}"
 k8s_apply "${manifests[staging]}"
 k8s_apply "${manifests[prod]}"
+
+# The ApplicationSet is deliberately not allowed to create namespaces. Ensure
+# its dev and prod destinations exist before it registers Applications. The
+# staging namespace is already bootstrap-owned by chaos-mesh-ns-annotation.
+log_info "Applying bootstrap-owned workload namespaces"
+k8s_apply "${manifests[workload_namespaces]}"
 
 # ApplicationSet must exist before a future Kargo argocd-update step can find
 # the generated Applications. Registration—not health—is all this phase

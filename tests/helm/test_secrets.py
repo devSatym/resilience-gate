@@ -76,7 +76,8 @@ def test_environment_uses_external_secret_for_all_runtime_credentials(
         "redis_password",
         "service_wallet_address",
     }
-    assert all(key.startswith(f"resilience-gate/{environment}/") for key in remote_keys.values())
+    assert all(key.startswith(f"resilience-gate-{environment}-") for key in remote_keys.values())
+    assert all("/" not in key for key in remote_keys.values())
 
     deployment = resource(documents, "Deployment", f"url-shortener-{environment}")
     env_from = deployment["spec"]["template"]["spec"]["containers"][0]["envFrom"]

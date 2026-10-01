@@ -1,0 +1,18 @@
+# Bootstrap owns the workload namespaces targeted by the ApplicationSet.
+# Staging remains in chaos-mesh-ns-annotation.yaml because it is the only
+# namespace deliberately opted into Chaos Mesh.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: url-shortener-dev
+  annotations:
+    # Removing this bootstrap resource must not cascade-delete workload data.
+    argocd.argoproj.io/sync-options: Prune=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: url-shortener-prod
+  annotations:
+    # Removing this bootstrap resource must not cascade-delete workload data.
+    argocd.argoproj.io/sync-options: Prune=false

@@ -5,6 +5,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP = REPO_ROOT / "platform_setup_scripts" / "bootstrap.sh"
@@ -45,11 +47,31 @@ def test_all_tokenized_promotion_resources_are_reviewed_renderer_outputs() -> No
         "kubernetes/apps/appproject.yaml",
         "kubernetes/apps/applicationset.yaml",
         "kubernetes/bootstrap/chaos-gate.yaml",
+        "kubernetes/jobs/radius-signer.yaml",
     }
     for path in expected:
         assert f'Path("{path}")' in source
         template = REPO_ROOT / "platform_setup_scripts" / "templates" / path
         assert template.with_suffix(template.suffix + ".tmpl").is_file()
+
+
+def test_bootstrap_owns_application_set_workload_namespaces_before_registration() -> None:
+    namespace_manifest = REPO_ROOT / "kubernetes" / "bootstrap" / "workload-namespaces.yaml"
+    kustomization = REPO_ROOT / "kubernetes" / "bootstrap" / "kustomization.yaml"
+    source = GITOPS_PHASE.read_text(encoding="utf-8")
+
+    namespaces = [
+        document["metadata"]["name"]
+        for document in yaml.safe_load_all(namespace_manifest.read_text(encoding="utf-8"))
+        if document
+    ]
+
+    assert namespaces == ["url-shortener-dev", "url-shortener-prod"]
+    assert "workload-namespaces.yaml" in kustomization.read_text(encoding="utf-8")
+    assert 'k8s_apply "${manifests[workload_namespaces]}"' in source
+    assert source.index('k8s_apply "${manifests[workload_namespaces]}"') < source.index(
+        'k8s_apply "${manifests[app_set]}"'
+    )
 
 
 def test_promotion_contract_names_the_deferred_gate_boundary() -> None:

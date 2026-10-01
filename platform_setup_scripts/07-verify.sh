@@ -160,6 +160,9 @@ verify_gitops() {
   check "Application/chaos-jobs exists" namespaced_resource_exists argocd application chaos-jobs
   check "Application/chaos-gate exists" namespaced_resource_exists argocd application chaos-gate
   check "ApplicationSet/resilience-gate exists" namespaced_resource_exists argocd applicationset resilience-gate
+  check "Namespace/url-shortener-dev exists" namespace_exists url-shortener-dev
+  check "Namespace/url-shortener-staging exists" namespace_exists url-shortener-staging
+  check "Namespace/url-shortener-prod exists" namespace_exists url-shortener-prod
   check "Kargo Project/resilience-gate exists" cluster_resource_exists project resilience-gate
   check "Kargo ProjectConfig/resilience-gate exists" \
     namespaced_resource_exists resilience-gate projectconfig resilience-gate
@@ -179,7 +182,6 @@ verify_gitops() {
 verify_gate() {
   log_info "Checking bounded chaos-gate prerequisites"
   check "Namespace/resilience-gate exists" namespace_exists resilience-gate
-  check "Namespace/url-shortener-staging exists" namespace_exists url-shortener-staging
   check "ServiceAccount/chaos-gate exists" \
     namespaced_resource_exists resilience-gate serviceaccount chaos-gate
   check "Role/chaos-gate-lock exists" namespaced_resource_exists resilience-gate role chaos-gate-lock
