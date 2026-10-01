@@ -138,6 +138,7 @@ def test_observability_retains_ssa_and_ignores_gke_deployment_status_field() -> 
         assert application["spec"]["syncPolicy"]["syncOptions"] == [
             "CreateNamespace=false",
             "ServerSideApply=true",
+            "RespectIgnoreDifferences=true",
         ]
         assert application["spec"]["ignoreDifferences"] == [
             {

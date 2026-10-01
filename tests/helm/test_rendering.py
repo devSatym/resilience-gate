@@ -70,6 +70,8 @@ def test_environment_render_is_immutable_hardened_and_testnet_only(
         "capabilities": {"drop": ["ALL"]},
         "readOnlyRootFilesystem": True,
         "runAsNonRoot": True,
+        "runAsUser": 10001,
+        "runAsGroup": 10001,
     }
     assert container["livenessProbe"]["httpGet"]["path"] == "/livez"
     assert container["readinessProbe"]["httpGet"]["path"] == "/ready"
