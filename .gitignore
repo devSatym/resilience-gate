@@ -37,6 +37,7 @@ tmp/
 
 # Private local planning material
 .plan/
+plan/
 
 # Terraform
 .terraform/
