@@ -6,6 +6,18 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP = REPO_ROOT / "platform_setup_scripts" / "bootstrap.sh"
+PHASE_SCRIPTS = tuple(
+    REPO_ROOT / "platform_setup_scripts" / f"{phase}-{name}.sh"
+    for phase, name in (
+        ("00", "preflight"),
+        ("01", "apis-and-bucket"),
+        ("02", "secrets"),
+        ("03", "terraform"),
+        ("04", "platform"),
+        ("05", "cluster-resources"),
+        ("06", "gitops-and-kargo"),
+    )
+)
 
 
 def test_bootstrap_help_exposes_completed_safe_phases_but_not_post_bootstrap_verification() -> None:
@@ -37,3 +49,9 @@ def test_bootstrap_accepts_completed_phase_six_but_rejects_phase_seven_before_lo
     )
     assert result.returncode == 2
     assert "between 00 and 06" in result.stderr
+
+
+def test_every_bootstrap_phase_script_is_executable() -> None:
+    for script in PHASE_SCRIPTS:
+        assert script.is_file(), f"missing bootstrap phase script: {script.name}"
+        assert script.stat().st_mode & 0o111, f"bootstrap phase script is not executable: {script.name}"
