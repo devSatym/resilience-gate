@@ -32,7 +32,8 @@ def test_platform_uses_persistent_secret_and_workload_identities() -> None:
     assert 'api.secret.name=$kargo_secret_name' in source
     assert "ADMIN_ACCOUNT_PASSWORD_HASH" in source
     assert "kubectl create namespace kargo --dry-run=client -o yaml" in source
-    assert "iam.gke.io/gcp-service-account=$kargo_gcp_service_account" in source
+    assert "iam.gke.io/gcp-service-account- --overwrite" in source
+    assert "must use its direct Workload Identity principal" in source
     assert "api.adminAccount.passwordHash" not in source
     assert "api.adminAccount.tokenSigningKey" not in source
 

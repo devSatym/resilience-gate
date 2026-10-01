@@ -51,14 +51,7 @@ output "eso_kubernetes_service_account_annotation" {
   description = "Annotation map for the configured External Secrets Operator Kubernetes service account."
 }
 
-output "kargo_gcp_service_account_email" {
-  value       = google_service_account.kargo_registry_reader.email
-  description = "Google service account to annotate on the Kargo controller Kubernetes service account."
-}
-
-output "kargo_kubernetes_service_account_annotation" {
-  value = {
-    "iam.gke.io/gcp-service-account" = google_service_account.kargo_registry_reader.email
-  }
-  description = "Annotation map for the configured Kargo controller Kubernetes service account."
+output "kargo_project_gcp_service_account_email" {
+  value       = google_service_account.kargo_project_registry_reader.email
+  description = "Project-specific Google service account Kargo impersonates to read the private Artifact Registry."
 }

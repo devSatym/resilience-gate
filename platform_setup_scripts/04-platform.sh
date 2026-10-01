@@ -136,17 +136,16 @@ run helm upgrade --install kargo "$KARGO_CHART_REF" \
   --set "api.secret.name=$kargo_secret_name" \
   --wait --timeout "$HELM_TIMEOUT"
 
-# Kargo 1.3.0 does not expose generic ServiceAccount annotations as chart
-# values. This durable, idempotent annotation wires the least-privilege GAR
-# reader identity created by Terraform to its exact controller account.
-kargo_gcp_service_account="kargo-gar-reader@${PROJECT_ID}.iam.gserviceaccount.com"
+# Kargo 1.3 uses the controller KSA's direct GKE Workload Identity principal
+# to impersonate the project-specific GSA provisioned by Terraform. A legacy
+# KSA-to-GSA annotation changes that principal and breaks GAR discovery.
 if is_dry_run; then
-  run kubectl annotate serviceaccount kargo-controller --namespace kargo "iam.gke.io/gcp-service-account=$kargo_gcp_service_account" --overwrite
+  run kubectl annotate serviceaccount kargo-controller --namespace kargo iam.gke.io/gcp-service-account- --overwrite
 else
-  kubectl annotate serviceaccount kargo-controller --namespace kargo "iam.gke.io/gcp-service-account=$kargo_gcp_service_account" --overwrite >/dev/null
+  kubectl annotate serviceaccount kargo-controller --namespace kargo iam.gke.io/gcp-service-account- --overwrite >/dev/null
   kargo_annotation=$(kubectl get serviceaccount kargo-controller --namespace kargo -o jsonpath='{.metadata.annotations.iam\.gke\.io/gcp-service-account}')
-  if [ "$kargo_annotation" != "$kargo_gcp_service_account" ]; then
-    log_err "Kargo controller Workload Identity annotation did not match the Terraform identity"
+  if [ -n "$kargo_annotation" ]; then
+    log_err "Kargo controller must use its direct Workload Identity principal"
     exit 1
   fi
 fi

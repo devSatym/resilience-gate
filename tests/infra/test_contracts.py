@@ -155,11 +155,13 @@ class TerraformInfrastructureContracts(unittest.TestCase):
 
         self.assertIn('account_id   = "external-secrets-sa"', eso)
         self.assertIn("roles/secretmanager.secretAccessor", eso)
-        self.assertIn('account_id   = "kargo-gar-reader"', kargo)
+        self.assertIn('account_id   = "kargo-project-resilience-gate"', kargo)
         self.assertIn("roles/artifactregistry.reader", kargo)
-        self.assertIn("kargo_workload_identity_binding", kargo)
+        self.assertIn("roles/iam.serviceAccountTokenCreator", kargo)
+        self.assertIn("kargo_project_token_creator", kargo)
+        self.assertIn("workloadIdentityPools/${var.project_id}.svc.id.goog", kargo)
         self.assertIn('output "eso_gcp_service_account_email"', outputs)
-        self.assertIn('output "kargo_gcp_service_account_email"', outputs)
+        self.assertIn('output "kargo_project_gcp_service_account_email"', outputs)
 
         eso_account = re.search(r'account_id\s*=\s*"([^"]+)"', eso)
         kargo_account = re.search(r'account_id\s*=\s*"([^"]+)"', kargo)
