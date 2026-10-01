@@ -20,7 +20,9 @@ def write_executable(path: Path, contents: str) -> None:
     path.chmod(0o755)
 
 
-def fake_gate_environment(tmp_path: Path) -> dict[str, str]:
+def fake_gate_environment(
+    tmp_path: Path, *, workflow_nodes_disappear_on_completion: bool = False
+) -> dict[str, str]:
     """Create a hermetic API simulation where scoring fails after a full run."""
     scripts = tmp_path / "scripts"
     scripts.mkdir()
@@ -32,6 +34,16 @@ def fake_gate_environment(tmp_path: Path) -> dict[str, str]:
     state.mkdir()
     calls = tmp_path / "kubectl.calls"
     kubectl = tmp_path / "kubectl"
+    completion_marker = (
+        f"touch {state}/workflow-completed;"
+        if workflow_nodes_disappear_on_completion
+        else ""
+    )
+    node_visibility_guard = (
+        f"[[ -f {state}/workflow-completed ]] && exit 0;"
+        if workflow_nodes_disappear_on_completion
+        else ""
+    )
     write_executable(
         kubectl,
         f"""#!/usr/bin/env bash
@@ -50,12 +62,13 @@ if [[ "$args" == *" get job loadgen-gate-test-1 "* ]]; then
 fi
 if [[ "$args" == *" get workflow chaos-gate-run-1 "* ]]; then
   [[ -f {state}/workflow-deleted ]] && exit 1
-  if [[ "$args" == *"status.conditions"* ]]; then echo 'Accomplished=True'; fi
+  if [[ "$args" == *"status.conditions"* ]]; then {completion_marker} echo 'Accomplished=True'; fi
   if [[ "$args" == *"status.startTime"* ]]; then echo '2026-10-01T12:00:00Z'; fi
   if [[ "$args" == *"status.endTime"* ]]; then echo '2026-10-01T12:08:00Z'; fi
   exit 0
 fi
 if [[ "$args" == *" get workflownode "* ]]; then
+  {node_visibility_guard}
   printf 'postgres\\t2026-10-01T12:01:30Z\\nredis\\t2026-10-01T12:04:30Z\\nsigner\\t2026-10-01T12:06:30Z\\n'
   exit 0
 fi
@@ -121,6 +134,25 @@ def test_pre_annotation_runner_still_preserves_the_gate_verdict(tmp_path: Path) 
     # failure into success or make an earlier runner unusable.
     assert result.returncode == 1
     assert "annotation helper is unavailable; skipping non-fatally" in result.stderr
+
+
+def test_collects_workflow_node_timestamps_before_terminal_gc(tmp_path: Path) -> None:
+    """Scorecards retain fault timestamps even after Chaos Mesh removes nodes."""
+    result = subprocess.run(
+        ["bash", str(ORCHESTRATOR)],
+        env=fake_gate_environment(tmp_path, workflow_nodes_disappear_on_completion=True),
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    # The fixture's scorer intentionally fails, but a missing timestamp must
+    # not be the cause after the Workflow transitions to terminal.
+    assert result.returncode == 1
+    assert "workflow did not expose a start time" not in result.stderr
+    calls = (tmp_path / "kubectl.calls").read_text(encoding="utf-8")
+    assert calls.count("get workflownode") >= 2
 
 
 def test_lock_and_target_permissions_match_the_orchestrator_contract() -> None:

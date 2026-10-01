@@ -377,6 +377,10 @@ wait_for_workflow() {
   local deadline conditions
   deadline=$(( $(now_epoch) + WORKFLOW_TIMEOUT_SECONDS ))
   while :; do
+    # Chaos Mesh removes WorkflowNodes as the Workflow reaches a terminal
+    # state. Preserve each fault's durable start time while the Workflow is
+    # still running, so post-workflow scorecards do not lose their evidence.
+    collect_injection_times || return 1
     conditions=$("$KUBECTL" -n "$TARGET_NAMESPACE" get workflow "$WORKFLOW_NAME" \
       -o jsonpath='{range .status.conditions[*]}{.type}={.status}{" "}{end}' \
       2>/dev/null || true)
