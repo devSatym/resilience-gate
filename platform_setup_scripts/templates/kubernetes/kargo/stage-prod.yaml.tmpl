@@ -58,6 +58,7 @@ spec:
             path: ${{ vars.sourcePath }}/helm/url-shortener
             releaseName: url-shortener-${{ ctx.stage }}
             namespace: url-shortener-${{ ctx.stage }}
+            kubeVersion: "1.35.8"
             valuesFiles:
               - ${{ vars.sourcePath }}/helm/url-shortener/values.yaml
               - ${{ vars.sourcePath }}/helm/url-shortener/values-${{ ctx.stage }}.yaml

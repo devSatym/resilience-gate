@@ -127,6 +127,18 @@ def test_rendered_templates_use_freight_identities_without_unsupported_stage_var
     assert "optional: true" in analysis_template
 
 
+def test_every_stage_passes_the_target_gke_version_to_helm_template() -> None:
+    stage_root = REPO_ROOT / "kubernetes" / "kargo"
+    template_root = REPO_ROOT / "platform_setup_scripts" / "templates" / "kubernetes" / "kargo"
+
+    for stage in ("dev", "staging", "prod"):
+        for root, suffix in ((stage_root, ".yaml"), (template_root, ".yaml.tmpl")):
+            manifest = load(root / f"stage-{stage}{suffix}")
+            steps = manifest["spec"]["promotionTemplate"]["spec"]["steps"]
+            helm_template = next(step for step in steps if step["uses"] == "helm-template")
+            assert helm_template["config"]["kubeVersion"] == "1.35.8"
+
+
 def test_complete_gate_resources_are_reachable_before_warehouse_discovery() -> None:
     bootstrap_root = REPO_ROOT / "kubernetes" / "bootstrap"
     kustomization = load(bootstrap_root / "kustomization.yaml")
