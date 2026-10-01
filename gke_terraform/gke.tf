@@ -1,4 +1,6 @@
 resource "google_container_cluster" "gke_cluster" {
+  provider = google-beta
+
   project  = var.project_id
   name     = var.cluster_name
   location = var.zone
@@ -35,13 +37,6 @@ resource "google_container_cluster" "gke_cluster" {
     services_secondary_range_name = local.svc_secondary_range
   }
 
-  # GKE's Private Service Connect default is the cluster primary subnet. Set
-  # that existing subnet explicitly because the current provider otherwise
-  # force-sends this API field as an invalid empty string.
-  private_cluster_config {
-    private_endpoint_subnetwork = google_compute_subnetwork.gke_subnet.id
-  }
-
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
@@ -66,6 +61,8 @@ resource "google_container_cluster" "gke_cluster" {
 }
 
 resource "google_container_node_pool" "default" {
+  provider = google-beta
+
   project    = var.project_id
   name       = "default-pool"
   location   = var.zone

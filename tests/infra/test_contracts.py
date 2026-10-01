@@ -79,10 +79,6 @@ class TerraformInfrastructureContracts(unittest.TestCase):
         self.assertIn('service_account = google_service_account.gke_nodes.email', cluster)
         self.assertIn('logging_variant = "DEFAULT"', cluster)
         self.assertIn(
-            'private_endpoint_subnetwork = google_compute_subnetwork.gke_subnet.id',
-            cluster,
-        )
-        self.assertIn(
             'google_project_iam_member.gke_nodes_default_node_service_account,',
             cluster,
         )
@@ -110,6 +106,18 @@ class TerraformInfrastructureContracts(unittest.TestCase):
             iam,
         )
         self.assertIn('depends_on = [google_project_service.container]', iam)
+
+    def test_gke_resources_use_the_pinned_endpoint_compatibility_provider(self) -> None:
+        main = terraform_source("main.tf")
+        gke = terraform_source("gke.tf")
+        cluster, node_pool = gke.split('resource "google_container_node_pool" "default"', 1)
+
+        self.assertIn('source  = "hashicorp/google-beta"', main)
+        self.assertIn('version = "= 6.10.0"', main)
+        self.assertIn('provider "google-beta"', main)
+        self.assertIn('provider = google-beta', cluster)
+        self.assertIn('provider = google-beta', node_pool)
+        self.assertNotIn('private_endpoint_subnetwork', cluster)
 
     def test_github_publisher_is_bound_to_repository_ref_and_event(self) -> None:
         oidc = terraform_source("github-oidc.tf")

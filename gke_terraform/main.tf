@@ -6,6 +6,14 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 7.22"
     }
+    # v6.11+ always serializes control-plane endpoint fields that this GKE API
+    # target rejects. Limit the compatibility provider to the two GKE
+    # resources below; the rest of the foundation remains on the current GA
+    # provider.
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "= 6.10.0"
+    }
   }
 
   # Backend settings cannot use Terraform variables. Supply them at init time,
@@ -14,6 +22,12 @@ terraform {
 }
 
 provider "google" {
+  project = var.project_id
+  region  = var.region
+  zone    = var.zone
+}
+
+provider "google-beta" {
   project = var.project_id
   region  = var.region
   zone    = var.zone
