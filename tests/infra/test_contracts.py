@@ -77,7 +77,7 @@ class TerraformInfrastructureContracts(unittest.TestCase):
 
     def test_cluster_initial_pool_uses_the_dedicated_node_identity(self) -> None:
         gke = terraform_source("gke.tf")
-        cluster, _ = gke.split('resource "google_container_node_pool" "default"', 1)
+        cluster, _ = gke.split('resource "google_container_node_pool" "general"', 1)
 
         # remove_default_node_pool still creates a transient initial pool.
         # It must use the role-bound dedicated identity rather than a default
@@ -101,7 +101,7 @@ class TerraformInfrastructureContracts(unittest.TestCase):
 
     def test_gke_preserves_only_the_server_owned_provisioning_label(self) -> None:
         gke = terraform_source("gke.tf")
-        cluster, node_pool = gke.split('resource "google_container_node_pool" "default"', 1)
+        cluster, node_pool = gke.split('resource "google_container_node_pool" "general"', 1)
         server_label = 'node_config[0].resource_labels["goog-gke-node-pool-provisioning-model"]'
 
         self.assertIn('node_config[0].resource_labels,', cluster)
@@ -128,7 +128,7 @@ class TerraformInfrastructureContracts(unittest.TestCase):
     def test_gke_resources_use_the_pinned_endpoint_compatibility_provider(self) -> None:
         main = terraform_source("main.tf")
         gke = terraform_source("gke.tf")
-        cluster, node_pool = gke.split('resource "google_container_node_pool" "default"', 1)
+        cluster, node_pool = gke.split('resource "google_container_node_pool" "general"', 1)
 
         self.assertIn('source  = "hashicorp/google-beta"', main)
         self.assertIn('version = "= 6.10.0"', main)
@@ -147,6 +147,8 @@ class TerraformInfrastructureContracts(unittest.TestCase):
         self.assertIn('machine_type    = var.general_machine_type', general_pool)
         self.assertIn('mode = "GKE_METADATA"', general_pool)
         self.assertIn('default     = "e2-standard-4"', variables)
+        self.assertNotIn('name       = "default-pool"', gke)
+        self.assertNotIn('default_machine_type', variables)
 
     def test_github_publisher_is_bound_to_repository_ref_and_event(self) -> None:
         oidc = terraform_source("github-oidc.tf")

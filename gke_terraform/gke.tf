@@ -72,73 +72,8 @@ resource "google_container_cluster" "gke_cluster" {
   ]
 }
 
-resource "google_container_node_pool" "default" {
-  provider = google-beta
-
-  project    = var.project_id
-  name       = "default-pool"
-  location   = var.zone
-  cluster    = google_container_cluster.gke_cluster.name
-  node_count = var.default_node_count
-
-  management {
-    auto_repair  = true
-    auto_upgrade = true
-  }
-
-  upgrade_settings {
-    max_surge       = 1
-    max_unavailable = 0
-  }
-
-  node_config {
-    machine_type    = var.default_machine_type
-    disk_size_gb    = var.node_disk_size_gb
-    image_type      = "COS_CONTAINERD"
-    service_account = google_service_account.gke_nodes.email
-    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
-
-    # This is the node-side half of Workload Identity. It prevents Pods from
-    # using legacy metadata-server credentials and directs them to GKE metadata.
-    workload_metadata_config {
-      mode = "GKE_METADATA"
-    }
-
-    metadata = {
-      disable-legacy-endpoints = "true"
-    }
-
-    shielded_instance_config {
-      enable_integrity_monitoring = true
-      enable_secure_boot          = true
-    }
-
-    labels = {
-      role = "default"
-    }
-
-    resource_labels = local.common_labels
-  }
-
-  # GKE adds this provisioning-model label after creating the node pool. Keep
-  # all project labels managed while tolerating that server-owned key.
-  lifecycle {
-    ignore_changes = [
-      node_config[0].resource_labels["goog-gke-node-pool-provisioning-model"],
-    ]
-  }
-
-  depends_on = [
-    google_project_iam_member.gke_nodes_default_node_service_account,
-    google_project_iam_member.gke_nodes_log_writer,
-    google_project_iam_member.gke_nodes_metric_writer,
-    google_project_iam_member.gke_nodes_monitoring_viewer,
-  ]
-}
-
-# Keep the legacy pool managed during the capacity migration. The general pool
-# is created first so workloads can be drained deliberately before the legacy
-# pool is removed in the follow-up change.
+# The general pool is the steady-state capacity for all workloads. Its node
+# identity and Workload Identity configuration are explicit and durable.
 resource "google_container_node_pool" "general" {
   provider = google-beta
 

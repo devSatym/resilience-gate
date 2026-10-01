@@ -72,25 +72,6 @@ variable "cluster_name" {
   }
 }
 
-variable "default_node_count" {
-  description = "Steady-state node count for the default Standard GKE node pool."
-  type        = number
-  default     = 2
-  nullable    = false
-
-  validation {
-    condition     = var.default_node_count >= 1 && var.default_node_count <= 10
-    error_message = "default_node_count must be between 1 and 10."
-  }
-}
-
-variable "default_machine_type" {
-  description = "Machine type for the default GKE node pool."
-  type        = string
-  default     = "e2-standard-2"
-  nullable    = false
-}
-
 variable "general_node_count" {
   description = "Node count for the general-purpose GKE node pool."
   type        = number
@@ -111,7 +92,7 @@ variable "general_machine_type" {
 }
 
 variable "node_disk_size_gb" {
-  description = "Boot disk size for each default-pool node."
+  description = "Boot disk size for each general-pool node."
   type        = number
   default     = 50
   nullable    = false
