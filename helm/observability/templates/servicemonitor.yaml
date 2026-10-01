@@ -16,13 +16,15 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: url-shortener
+  # ServiceMonitor limits belong to the resource spec, not an individual
+  # endpoint. The v1 CRD rejects endpoint-level placement under SSA.
+  sampleLimit: 10000
+  labelLimit: 30
   endpoints:
     - port: http
       path: /metrics
       interval: 15s
       scrapeTimeout: 10s
-      sampleLimit: 10000
-      labelLimit: 30
       # Copy the k8s namespace into a `namespace` label so {namespace="..."} works in PromQL
       relabelings:
         - action: replace

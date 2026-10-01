@@ -2,12 +2,24 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
 
 import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHART = REPO_ROOT / "helm" / "observability"
+
+
+def render_chart() -> list[dict]:
+    result = subprocess.run(
+        ("helm", "template", "observability", str(CHART), "--namespace", "monitoring"),
+        capture_output=True,
+        check=True,
+        cwd=REPO_ROOT,
+        text=True,
+    )
+    return [document for document in yaml.safe_load_all(result.stdout) if document]
 
 
 def dashboard_json(path: Path, key: str) -> dict:
@@ -46,6 +58,7 @@ def test_metrics_and_logs_have_explicit_bounded_configuration() -> None:
     assert prometheus["storageSpec"]["volumeClaimTemplate"]["spec"]["resources"]["requests"]["storage"] == "10Gi"
     assert prometheus["serviceMonitorSelector"] == {"matchLabels": {"release": "observability"}}
     assert values["loki"]["loki"]["limits_config"]["retention_period"] == "72h"
+    assert values["loki"]["chunksCache"] == {"enabled": True, "allocatedMemory": 1024}
     assert "promtail" not in values
 
     alloy = (CHART / "templates" / "alloy-configmap.yaml").read_text(encoding="utf-8")
@@ -53,12 +66,44 @@ def test_metrics_and_logs_have_explicit_bounded_configuration() -> None:
     assert "loki.write \"default\"" in alloy
     assert "hostPath:" not in alloy
 
+    documents = render_chart()
+    chunks_cache = next(
+        document
+        for document in documents
+        if document["kind"] == "StatefulSet"
+        and document["metadata"]["name"] == "observability-loki-chunks-cache"
+    )
+    memcached = next(
+        container
+        for container in chunks_cache["spec"]["template"]["spec"]["containers"]
+        if container["name"] == "memcached"
+    )
+    assert memcached["args"][0] == "-m 1024"
+    assert memcached["resources"] == {
+        "limits": {"memory": "1229Mi"},
+        "requests": {"cpu": "500m", "memory": "1229Mi"},
+    }
+
 
 def test_service_monitors_and_dashboards_cover_the_application_contract() -> None:
-    service_monitor = (CHART / "templates" / "servicemonitor.yaml").read_text(encoding="utf-8")
-    assert "release: observability" in service_monitor
-    assert "path: /metrics" in service_monitor
-    assert "sampleLimit: 10000" in service_monitor
+    monitors = [
+        document
+        for document in render_chart()
+        if document["kind"] == "ServiceMonitor"
+        and document["metadata"]["name"].startswith("url-shortener-")
+    ]
+    assert {monitor["metadata"]["name"] for monitor in monitors} == {
+        "url-shortener-url-shortener-dev",
+        "url-shortener-url-shortener-staging",
+        "url-shortener-url-shortener-prod",
+    }
+    for monitor in monitors:
+        spec = monitor["spec"]
+        assert spec["sampleLimit"] == 10000
+        assert spec["labelLimit"] == 30
+        assert spec["endpoints"][0]["path"] == "/metrics"
+        assert "sampleLimit" not in spec["endpoints"][0]
+        assert "labelLimit" not in spec["endpoints"][0]
 
     application = dashboard_json(CHART / "templates" / "dashboard-cm.yaml", "url-shortener.json")
     chaos = dashboard_json(CHART / "templates" / "chaos-demo-dashboard-cm.yaml", "chaos-demo.json")
