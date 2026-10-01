@@ -1,0 +1,23 @@
+---
+# Source: url-shortener/charts/redis/templates/headless-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: url-shortener-staging-redis-headless
+  namespace: "url-shortener-staging"
+  labels:
+    app.kubernetes.io/instance: url-shortener-staging
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 8.6.1
+    helm.sh/chart: redis-25.3.5
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+  selector:
+    app.kubernetes.io/instance: url-shortener-staging
+    app.kubernetes.io/name: redis

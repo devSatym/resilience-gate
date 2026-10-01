@@ -1,0 +1,26 @@
+---
+# Source: url-shortener/charts/redis/templates/master/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: url-shortener-staging-redis-master
+  namespace: "url-shortener-staging"
+  labels:
+    app.kubernetes.io/instance: url-shortener-staging
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 8.6.1
+    helm.sh/chart: redis-25.3.5
+    app.kubernetes.io/component: master
+spec:
+  type: ClusterIP
+  internalTrafficPolicy: Cluster
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+      nodePort: null
+  selector:
+    app.kubernetes.io/instance: url-shortener-staging
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: master

@@ -1,0 +1,27 @@
+---
+# Source: url-shortener/charts/redis/templates/networkpolicy.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: url-shortener-staging-redis
+  namespace: "url-shortener-staging"
+  labels:
+    app.kubernetes.io/instance: url-shortener-staging
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 8.6.1
+    helm.sh/chart: redis-25.3.5
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: url-shortener-staging
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
+  ingress:
+    # Allow inbound connections
+    - ports:
+        - port: 6379

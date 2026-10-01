@@ -1,0 +1,22 @@
+---
+# Source: url-shortener/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: url-shortener-staging-config
+  labels:
+    helm.sh/chart: url-shortener-0.1.0
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: url-shortener-staging
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  BASE_URL: "http://url-shortener-staging.url-shortener-staging.svc.cluster.local"
+  CODE_LENGTH: "8"
+  REDIS_TTL_SECONDS: "3600"
+  DEPENDENCY_TIMEOUT_SECONDS: "2"
+  SBC_CONTRACT_ADDRESS: "0x33ad9e4bd16b69b5bfded37d8b5d9ff9aba014fb"
+  SHORTEN_FEE: "1000"
+  FACILITATOR_URL: "https://facilitator.testnet.radiustech.xyz"
+  NETWORK_CAIP2: "eip155:72344"
+  FACILITATOR_TIMEOUT_SECONDS: "10"

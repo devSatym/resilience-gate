@@ -1,0 +1,18 @@
+---
+# Source: url-shortener/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: url-shortener-staging
+  labels:
+    helm.sh/chart: url-shortener-0.1.0
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: url-shortener-staging
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: url-shortener-staging
