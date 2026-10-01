@@ -1,0 +1,21 @@
+---
+# Source: url-shortener/charts/postgresql/templates/primary/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: url-shortener-dev-postgresql
+  namespace: "url-shortener-dev"
+  labels:
+    app.kubernetes.io/instance: url-shortener-dev
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/version: 18.3.0
+    helm.sh/chart: postgresql-18.5.7
+    app.kubernetes.io/component: primary
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: url-shortener-dev
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/component: primary
