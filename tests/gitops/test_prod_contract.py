@@ -9,7 +9,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROD_PATH = REPO_ROOT / "kubernetes" / "kargo" / "stage-prod.yaml"
-PROJECT_CONFIG_PATH = REPO_ROOT / "kubernetes" / "kargo" / "projectconfig.yaml"
+PROJECT_PATH = REPO_ROOT / "kubernetes" / "kargo" / "project.yaml"
 ANALYSIS_PATH = REPO_ROOT / "kubernetes" / "kargo" / "analysistemplate.yaml"
 
 
@@ -19,7 +19,7 @@ def load(path: Path) -> dict[str, object]:
 
 def test_prod_can_only_receive_staging_freight_and_stays_manually_promoted() -> None:
     stage = load(PROD_PATH)
-    project_config = load(PROJECT_CONFIG_PATH)
+    project = load(PROJECT_PATH)
 
     assert stage["metadata"]["name"] == "prod"
     assert stage["metadata"]["namespace"] == "resilience-gate"
@@ -30,9 +30,9 @@ def test_prod_can_only_receive_staging_freight_and_stays_manually_promoted() -> 
             "sources": {"stages": ["staging"]},
         }
     ]
-    policies = project_config["spec"]["promotionPolicies"]
-    prod_policy = [policy for policy in policies if policy["stageSelector"] == {"name": "prod"}]
-    assert prod_policy == [{"stageSelector": {"name": "prod"}, "autoPromotionEnabled": False}]
+    policies = project["spec"]["promotionPolicies"]
+    prod_policy = [policy for policy in policies if policy["stage"] == "prod"]
+    assert prod_policy == [{"stage": "prod", "autoPromotionEnabled": False}]
 
 
 def test_prod_requires_post_deploy_health_without_premature_chaos_gate() -> None:

@@ -70,7 +70,7 @@ spec:
         - uses: git-push
           config:
             path: ${{ vars.renderedPath }}
-            branch: ${{ vars.targetBranch }}
+            targetBranch: ${{ vars.targetBranch }}
         - uses: argocd-update
           config:
             apps:

@@ -68,7 +68,7 @@ spec:
         - uses: git-push
           config:
             path: ${{ vars.renderedPath }}
-            branch: ${{ vars.targetBranch }}
+            targetBranch: ${{ vars.targetBranch }}
         # Keep targetRevision as env/dev in the ApplicationSet. Kargo asks Argo
         # CD to sync the exact rendered commit without creating out-of-Git state.
         - uses: argocd-update

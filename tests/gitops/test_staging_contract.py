@@ -15,19 +15,19 @@ STAGING_TEMPLATE_PATH = (
 ANALYSIS_TEMPLATE_PATH = (
     REPO_ROOT / "platform_setup_scripts" / "templates" / "kubernetes" / "kargo" / "analysistemplate.yaml.tmpl"
 )
-PROJECT_CONFIG_PATH = REPO_ROOT / "kubernetes" / "kargo" / "projectconfig.yaml"
+PROJECT_PATH = REPO_ROOT / "kubernetes" / "kargo" / "project.yaml"
 
 
 def load(path: Path) -> dict[str, object]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def stage_policy(project_config: dict[str, object], stage: str) -> bool:
-    policies = project_config["spec"]["promotionPolicies"]
+def stage_policy(project: dict[str, object], stage: str) -> bool:
+    policies = project["spec"]["promotionPolicies"]
     matching = [
         policy
         for policy in policies
-        if policy["stageSelector"] == {"name": stage}
+        if policy["stage"] == stage
     ]
     assert len(matching) == 1
     return matching[0]["autoPromotionEnabled"]
@@ -35,7 +35,7 @@ def stage_policy(project_config: dict[str, object], stage: str) -> bool:
 
 def test_staging_accepts_only_development_freight_and_requires_manual_promotion() -> None:
     stage = load(STAGING_PATH)
-    project_config = load(PROJECT_CONFIG_PATH)
+    project = load(PROJECT_PATH)
 
     assert stage["metadata"]["name"] == "staging"
     assert stage["metadata"]["namespace"] == "resilience-gate"
@@ -46,14 +46,13 @@ def test_staging_accepts_only_development_freight_and_requires_manual_promotion(
             "sources": {"stages": ["dev"]},
         }
     ]
-    assert stage_policy(project_config, "staging") is False
+    assert stage_policy(project, "staging") is False
 
 
 def test_staging_renders_the_freight_digest_and_requires_the_immutable_chaos_gate() -> None:
     # Public rendered manifests deliberately contain the selected deployment
     # identity. The portable contract belongs to the source template instead.
     stage = load(STAGING_TEMPLATE_PATH)
-    stage_vars = {item["name"]: item["value"] for item in stage["spec"]["vars"]}
     template = stage["spec"]["promotionTemplate"]["spec"]
     steps = template["steps"]
     yaml_update = next(step for step in steps if step["uses"] == "yaml-update")
@@ -62,13 +61,6 @@ def test_staging_renders_the_freight_digest_and_requires_the_immutable_chaos_gat
     assert {update["key"]: update["value"] for update in updates} == {
         "image.repository": "${{ vars.imageRepo }}",
         "image.digest": "${{ imageFrom(vars.imageRepo).Digest }}",
-    }
-    # Kargo evaluates verification outside promotionTemplate. These two
-    # Freight source identifiers must therefore be defined at Stage scope, not
-    # only inside the promotion template that produced the rendered commit.
-    assert stage_vars == {
-        "gitopsRepo": "{{GITHUB_REPOSITORY_URL}}",
-        "imageRepo": "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener",
     }
     assert stage["spec"]["verification"] == {
         "analysisTemplates": [{"name": "service-health"}, {"name": "chaos-gate"}],
@@ -79,11 +71,11 @@ def test_staging_renders_the_freight_digest_and_requires_the_immutable_chaos_gat
             },
             {
                 "name": "release-revision",
-                "value": "${{ commitFrom(vars.gitopsRepo).ID }}",
+                "value": "${{ commitFrom(\"{{GITHUB_REPOSITORY_URL}}\").ID }}",
             },
             {
                 "name": "release-digest",
-                "value": "${{ imageFrom(vars.imageRepo).Digest }}",
+                "value": "${{ imageFrom(\"{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener\").Digest }}",
             },
         ],
     }
@@ -122,14 +114,14 @@ def test_chaos_gate_job_uses_a_digest_and_cannot_change_its_scripts_at_runtime()
     assert "configMap" not in yaml.safe_dump(job)
 
 
-def test_rendered_templates_preserve_stage_verification_vars_and_optional_annotation_secret() -> None:
+def test_rendered_templates_use_freight_identities_without_unsupported_stage_vars() -> None:
     template_root = REPO_ROOT / "platform_setup_scripts" / "templates" / "kubernetes" / "kargo"
     stage_template = (template_root / "stage-staging.yaml.tmpl").read_text(encoding="utf-8")
     analysis_template = (template_root / "analysistemplate.yaml.tmpl").read_text(encoding="utf-8")
 
-    assert "spec:\n  # Verification runs outside the promotion template." in stage_template
-    assert "  vars:\n    - name: gitopsRepo" in stage_template
-    assert "    - name: imageRepo" in stage_template
+    assert "spec:\n  vars:" not in stage_template
+    assert 'commitFrom("{{GITHUB_REPOSITORY_URL}}").ID' in stage_template
+    assert 'imageFrom("{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener").Digest' in stage_template
     assert "activeDeadlineSeconds: 1320" in analysis_template
     assert "terminationGracePeriodSeconds: 120" in analysis_template
     assert "optional: true" in analysis_template

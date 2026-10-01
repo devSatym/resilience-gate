@@ -7,3 +7,14 @@ metadata:
   labels:
     app.kubernetes.io/part-of: resilience-gate
     resilience-gate.io/scope: testnet-only
+spec:
+  # Kargo v1.3 owns promotion policy on the Project itself. Development may
+  # promote discovered Freight automatically; staging and production-like
+  # testnet stages remain explicit, auditable operator actions.
+  promotionPolicies:
+    - stage: dev
+      autoPromotionEnabled: true
+    - stage: staging
+      autoPromotionEnabled: false
+    - stage: prod
+      autoPromotionEnabled: false

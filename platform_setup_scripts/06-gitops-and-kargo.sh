@@ -27,7 +27,6 @@ fi
 declare -A manifests=(
   [project]="$REPO_ROOT/kubernetes/kargo/project.yaml"
   [credentials]="$REPO_ROOT/kubernetes/kargo/credentials-git.yaml"
-  [project_config]="$REPO_ROOT/kubernetes/kargo/projectconfig.yaml"
   [analysis]="$REPO_ROOT/kubernetes/kargo/analysistemplate.yaml"
   [chaos_gate]="$REPO_ROOT/kubernetes/bootstrap/chaos-gate.yaml"
   [workload_namespaces]="$REPO_ROOT/kubernetes/bootstrap/workload-namespaces.yaml"
@@ -46,8 +45,9 @@ for name in "${!manifests[@]}"; do
   fi
 done
 
-# A Kargo Project owns its own namespace, so it must be registered before the
-# namespaced ProjectConfig, credential, Warehouse, and Stages.
+# A Kargo Project owns its own namespace, so it must be registered before its
+# namespaced credential, Warehouse, and Stages. Kargo v1.3 keeps promotion
+# policy on the Project rather than a separate ProjectConfig resource.
 log_info "Applying Kargo Project"
 k8s_apply "${manifests[project]}"
 if ! is_dry_run; then
@@ -65,7 +65,6 @@ if ! is_dry_run; then
 fi
 
 log_info "Applying Kargo policy, health analyses, and stage contracts"
-k8s_apply "${manifests[project_config]}"
 k8s_apply "${manifests[analysis]}"
 k8s_apply "${manifests[dev]}"
 k8s_apply "${manifests[staging]}"

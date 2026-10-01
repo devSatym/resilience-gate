@@ -16,10 +16,9 @@ spec:
     - image:
         repoURL: "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener"
         imageSelectionStrategy: NewestBuild
-        allowTagsRegexes:
-          - "^sha-[a-f0-9]{7,40}$"
-        ignoreTagsRegexes:
-          - "^(latest|buildcache|pr-[0-9]+)$"
+        # Kargo v1.3 accepts one allowTags regular expression. The strict
+        # sha-only pattern excludes mutable and non-release CI tags.
+        allowTags: "^sha-[a-f0-9]{7,40}$"
     # The rendered env/* branches are outputs, never Freight sources. Only the
     # chart and environment values on main create a new source revision.
     - git:

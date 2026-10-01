@@ -38,9 +38,9 @@ def test_warehouse_combines_chart_revision_and_digest_backed_image_freight() -> 
 
     assert image["repoURL"] == "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener"
     assert image["imageSelectionStrategy"] == "NewestBuild"
-    assert image["allowTagsRegexes"] == ["^sha-[a-f0-9]{7,40}$"]
-    assert image["ignoreTagsRegexes"] == ["^(latest|buildcache|pr-[0-9]+)$"]
-    assert "allowTags" not in image
+    assert image["allowTags"] == "^sha-[a-f0-9]{7,40}$"
+    assert "allowTagsRegexes" not in image
+    assert "ignoreTagsRegexes" not in image
 
     assert git == {
         "repoURL": "{{GITHUB_REPOSITORY_URL}}",
