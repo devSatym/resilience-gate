@@ -137,6 +137,17 @@ class TerraformInfrastructureContracts(unittest.TestCase):
         self.assertIn('provider = google-beta', node_pool)
         self.assertNotIn('private_endpoint_subnetwork', cluster)
 
+    def test_general_node_pool_has_the_requested_capacity_and_workload_identity(self) -> None:
+        gke = terraform_source("gke.tf")
+        variables = terraform_source("variables.tf")
+        _, general_pool = gke.split('resource "google_container_node_pool" "general"', 1)
+
+        self.assertIn('name       = "general-pool"', general_pool)
+        self.assertIn('node_count = var.general_node_count', general_pool)
+        self.assertIn('machine_type    = var.general_machine_type', general_pool)
+        self.assertIn('mode = "GKE_METADATA"', general_pool)
+        self.assertIn('default     = "e2-standard-4"', variables)
+
     def test_github_publisher_is_bound_to_repository_ref_and_event(self) -> None:
         oidc = terraform_source("github-oidc.tf")
 

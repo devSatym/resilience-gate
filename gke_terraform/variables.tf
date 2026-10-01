@@ -91,6 +91,25 @@ variable "default_machine_type" {
   nullable    = false
 }
 
+variable "general_node_count" {
+  description = "Node count for the general-purpose GKE node pool."
+  type        = number
+  default     = 2
+  nullable    = false
+
+  validation {
+    condition     = var.general_node_count >= 1 && var.general_node_count <= 10
+    error_message = "general_node_count must be between 1 and 10."
+  }
+}
+
+variable "general_machine_type" {
+  description = "Machine type for the general-purpose GKE node pool."
+  type        = string
+  default     = "e2-standard-4"
+  nullable    = false
+}
+
 variable "node_disk_size_gb" {
   description = "Boot disk size for each default-pool node."
   type        = number
