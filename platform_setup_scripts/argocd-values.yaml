@@ -1,0 +1,8 @@
+# The GKE NEG controller owns this Service annotation after creation. Keep the
+# narrow normalization in Argo CD's controller configuration, where it is
+# applied consistently before application comparison and server-side sync.
+configs:
+  cm:
+    resource.customizations.ignoreDifferences._Service: |
+      jsonPointers:
+        - /metadata/annotations/cloud.google.com~1neg

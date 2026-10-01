@@ -34,6 +34,7 @@ run helm upgrade --install cert-manager jetstack/cert-manager \
 run helm upgrade --install argocd argo/argo-cd \
   --namespace argocd --create-namespace \
   --version "$ARGOCD_CHART_VERSION" \
+  --values "$SCRIPT_DIR/argocd-values.yaml" \
   --wait --timeout "$HELM_TIMEOUT"
 
 run helm upgrade --install argo-rollouts argo/argo-rollouts \

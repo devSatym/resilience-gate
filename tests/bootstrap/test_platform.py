@@ -38,6 +38,15 @@ def test_platform_uses_persistent_secret_and_workload_identities() -> None:
     assert "api.adminAccount.tokenSigningKey" not in source
 
 
+def test_platform_configures_argo_to_ignore_gke_owned_service_neg_annotations() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    values = (REPO_ROOT / "platform_setup_scripts" / "argocd-values.yaml").read_text(encoding="utf-8")
+
+    assert '--values "$SCRIPT_DIR/argocd-values.yaml"' in source
+    assert "resource.customizations.ignoreDifferences._Service" in values
+    assert "/metadata/annotations/cloud.google.com~1neg" in values
+
+
 def test_platform_uses_the_portable_stdin_only_bcrypt_contract() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     library = (REPO_ROOT / "platform_setup_scripts" / "lib.sh").read_text(encoding="utf-8")

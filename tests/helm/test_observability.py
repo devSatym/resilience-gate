@@ -9,6 +9,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHART = REPO_ROOT / "helm" / "observability"
+ARGOCD_VALUES = REPO_ROOT / "platform_setup_scripts" / "argocd-values.yaml"
 
 
 def render_chart() -> list[dict]:
@@ -155,9 +156,9 @@ def test_observability_retains_ssa_and_ignores_gke_deployment_status_field() -> 
                     ".spec.volumeClaimTemplates[]?.status",
                 ],
             },
-            {
-                "group": "",
-                "kind": "Service",
-                "jsonPointers": ["/metadata/annotations/cloud.google.com~1neg"],
-            },
         ]
+
+    controller_values = yaml.safe_load(ARGOCD_VALUES.read_text(encoding="utf-8"))
+    assert controller_values["configs"]["cm"][
+        "resource.customizations.ignoreDifferences._Service"
+    ] == "jsonPointers:\n  - /metadata/annotations/cloud.google.com~1neg\n"

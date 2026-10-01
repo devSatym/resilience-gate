@@ -30,10 +30,6 @@ spec:
       jqPathExpressions:
         - .spec.volumeClaimTemplates[]?.spec.volumeMode
         - .spec.volumeClaimTemplates[]?.status
-    - group: ""
-      kind: Service
-      jsonPointers:
-        - /metadata/annotations/cloud.google.com~1neg
   source:
     repoURL: "https://github.com/devSatym/resilience-gate.git"
     targetRevision: main
