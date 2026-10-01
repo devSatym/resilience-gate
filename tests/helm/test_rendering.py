@@ -178,3 +178,23 @@ def test_chart_dependencies_are_pinned_and_vendored() -> None:
     assert (CHART / "Chart.lock").is_file()
     assert (CHART / "charts" / "redis-25.3.5.tgz").is_file()
     assert (CHART / "charts" / "postgresql-18.5.7.tgz").is_file()
+
+
+def test_fragile_staging_overlay_changes_existing_chart_values() -> None:
+    documents = render(
+        "staging",
+        "--values",
+        str(CHART / "values-staging-fragile.yaml"),
+    )
+    deployment = resource(documents, "Deployment", "url-shortener-staging")
+    config = resource(documents, "ConfigMap", "url-shortener-staging-config")
+
+    assert deployment["spec"]["replicas"] == 1
+    assert "affinity" not in deployment["spec"]["template"]["spec"]
+    assert config["data"]["FACILITATOR_TIMEOUT_SECONDS"] == "2"
+    assert not any(
+        document["kind"] == "PodDisruptionBudget"
+        and document["metadata"]["name"] == "url-shortener-staging"
+        for document in documents
+    )
+    assert not any(document["kind"] == "PersistentVolumeClaim" for document in documents)

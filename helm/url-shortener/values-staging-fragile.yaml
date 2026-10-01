@@ -1,17 +1,19 @@
 # Fragile staging overlay, stacked on values-staging.yaml for the failure demo.
-# Deliberately brittle: single replica with no PDB (one pod kill = full outage),
-# a 2s facilitator timeout that trips under injected network latency, and no
-# persistence, so chaos blast radius is amplified.
+# Deliberately brittle: a single application replica with no application PDB
+# (one pod kill = full outage), a 2s facilitator timeout that trips under
+# injected network latency, and no persistence, so chaos blast radius is
+# amplified.
 
 replicaCount: 1
 
-podAntiAffinity:
-  enabled: false
+placement:
+  podAntiAffinity:
+    enabled: false
 podDisruptionBudget:
   enabled: false
 
-radius:
-  facilitatorTimeoutSeconds: "2"      # times out under 3s+ network latency injection
+payments:
+  timeoutSeconds: "2"      # times out under 3s+ network latency injection
 
 postgresql:
   primary:
