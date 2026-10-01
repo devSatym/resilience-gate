@@ -17,6 +17,13 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
+  # GKE 1.35 adds this status field after a Deployment is created. Ignore it
+  # before Argo CD's server-side-apply diff parses the live resource.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /status/terminatingReplicas
   source:
     repoURL: "https://github.com/devSatym/resilience-gate.git"
     targetRevision: main

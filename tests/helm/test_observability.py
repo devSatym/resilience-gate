@@ -64,6 +64,7 @@ def test_metrics_and_logs_have_explicit_bounded_configuration() -> None:
     alloy = (CHART / "templates" / "alloy-configmap.yaml").read_text(encoding="utf-8")
     assert 'loki.source.kubernetes "pods"' in alloy
     assert "loki.write \"default\"" in alloy
+    assert 'cluster = {{ .Values.clusterName | quote }},' in alloy
     assert "hostPath:" not in alloy
 
     documents = render_chart()
@@ -121,3 +122,27 @@ def test_gitops_bootstrap_orders_monitoring_before_its_secret() -> None:
     external_secret = (REPO_ROOT / "kubernetes/bootstrap/secrets/external-secrets-monitoring.yaml").read_text(encoding="utf-8")
     assert 'argocd.argoproj.io/sync-wave: "3"' in external_secret
     assert "name: resilience-gate-secrets" in external_secret
+
+
+def test_observability_retains_ssa_and_ignores_gke_deployment_status_field() -> None:
+    manifests = (
+        REPO_ROOT / "kubernetes/bootstrap/observability.yaml",
+        REPO_ROOT / "platform_setup_scripts/templates/kubernetes/bootstrap/observability.yaml.tmpl",
+    )
+    for manifest in manifests:
+        application = next(
+            document
+            for document in yaml.safe_load_all(manifest.read_text(encoding="utf-8"))
+            if document and document["kind"] == "Application"
+        )
+        assert application["spec"]["syncPolicy"]["syncOptions"] == [
+            "CreateNamespace=false",
+            "ServerSideApply=true",
+        ]
+        assert application["spec"]["ignoreDifferences"] == [
+            {
+                "group": "apps",
+                "kind": "Deployment",
+                "jsonPointers": ["/status/terminatingReplicas"],
+            }
+        ]
