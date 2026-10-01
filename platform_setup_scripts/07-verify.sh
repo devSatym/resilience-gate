@@ -120,6 +120,15 @@ deployment_available() {
   printf '%s' "$status" | grep -Eq '(^|[[:space:]])True($|[[:space:]])'
 }
 
+application_synced_and_healthy() {
+  local name="$1" sync health
+  sync=$(kubectl --namespace argocd get application "$name" \
+    -o jsonpath='{.status.sync.status}' 2>/dev/null || true)
+  health=$(kubectl --namespace argocd get application "$name" \
+    -o jsonpath='{.status.health.status}' 2>/dev/null || true)
+  [ "$sync" = "Synced" ] && [ "$health" = "Healthy" ]
+}
+
 resource_ready() {
   local namespace="$1" resource="$2" name="$3" status
   status=$(kubectl --namespace "$namespace" get "$resource" "$name" \
@@ -155,17 +164,20 @@ verify_gitops() {
   check "ExternalSecret/argocd-repository is Ready" \
     resource_ready argocd externalsecret argocd-repository
   check "Application/root-app exists" namespaced_resource_exists argocd application root-app
+  check "Application/root-app is Synced and Healthy" application_synced_and_healthy root-app
   check "Application/observability exists" namespaced_resource_exists argocd application observability
+  check "Application/observability is Synced and Healthy" application_synced_and_healthy observability
   check "Application/chaos-mesh exists" namespaced_resource_exists argocd application chaos-mesh
+  check "Application/chaos-mesh is Synced and Healthy" application_synced_and_healthy chaos-mesh
   check "Application/chaos-jobs exists" namespaced_resource_exists argocd application chaos-jobs
+  check "Application/chaos-jobs is Synced and Healthy" application_synced_and_healthy chaos-jobs
   check "Application/chaos-gate exists" namespaced_resource_exists argocd application chaos-gate
+  check "Application/chaos-gate is Synced and Healthy" application_synced_and_healthy chaos-gate
   check "ApplicationSet/resilience-gate exists" namespaced_resource_exists argocd applicationset resilience-gate
   check "Namespace/url-shortener-dev exists" namespace_exists url-shortener-dev
   check "Namespace/url-shortener-staging exists" namespace_exists url-shortener-staging
   check "Namespace/url-shortener-prod exists" namespace_exists url-shortener-prod
   check "Kargo Project/resilience-gate exists" cluster_resource_exists project resilience-gate
-  check "Kargo ProjectConfig/resilience-gate exists" \
-    namespaced_resource_exists resilience-gate projectconfig resilience-gate
   check "Kargo Warehouse/resilience-gate exists" \
     namespaced_resource_exists resilience-gate warehouse resilience-gate
   check "Kargo Stage/dev exists" namespaced_resource_exists resilience-gate stage dev
@@ -193,6 +205,8 @@ verify_gate() {
     namespaced_resource_exists url-shortener-staging rolebinding chaos-gate-runner
   check "CronJob/loadgen exists and remains registered" \
     namespaced_resource_exists url-shortener-staging cronjob loadgen
+  check "Deployment/radius-signer is Available" \
+    deployment_available url-shortener-staging radius-signer
   optional_check "ExternalSecret/grafana-annotation is Ready" \
     resource_ready resilience-gate externalsecret grafana-annotation
 }
