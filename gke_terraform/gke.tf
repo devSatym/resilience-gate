@@ -11,6 +11,13 @@ resource "google_container_cluster" "gke_cluster" {
   remove_default_node_pool = true
   initial_node_count       = 1
 
+  # GKE creates this initial pool before removing it, so it must not fall back
+  # to the Compute Engine default service account. Modern projects can leave
+  # that account without the role GKE requires for node creation.
+  node_config {
+    service_account = google_service_account.gke_nodes.email
+  }
+
   deletion_protection   = var.deletion_protection
   enable_shielded_nodes = true
   networking_mode       = "VPC_NATIVE"
@@ -41,6 +48,7 @@ resource "google_container_cluster" "gke_cluster" {
   depends_on = [
     google_project_service.compute,
     google_project_service.container,
+    google_project_iam_member.gke_nodes_default_node_service_account,
   ]
 }
 

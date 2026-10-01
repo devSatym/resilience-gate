@@ -68,6 +68,20 @@ class TerraformInfrastructureContracts(unittest.TestCase):
         self.assertIn('mode = "GKE_METADATA"', gke)
         self.assertIn('disable-legacy-endpoints = "true"', gke)
 
+    def test_cluster_initial_pool_uses_the_dedicated_node_identity(self) -> None:
+        gke = terraform_source("gke.tf")
+        cluster, _ = gke.split('resource "google_container_node_pool" "default"', 1)
+
+        # remove_default_node_pool still creates a transient initial pool.
+        # It must use the role-bound dedicated identity rather than a default
+        # Compute Engine service account that modern projects leave unprivileged.
+        self.assertIn('remove_default_node_pool = true', cluster)
+        self.assertIn('service_account = google_service_account.gke_nodes.email', cluster)
+        self.assertIn(
+            'google_project_iam_member.gke_nodes_default_node_service_account,',
+            cluster,
+        )
+
     def test_github_publisher_is_bound_to_repository_ref_and_event(self) -> None:
         oidc = terraform_source("github-oidc.tf")
 
