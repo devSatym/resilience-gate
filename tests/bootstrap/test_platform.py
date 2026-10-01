@@ -37,6 +37,16 @@ def test_platform_uses_persistent_secret_and_workload_identities() -> None:
     assert "api.adminAccount.tokenSigningKey" not in source
 
 
+def test_platform_uses_the_portable_stdin_only_bcrypt_contract() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    library = (REPO_ROOT / "platform_setup_scripts" / "lib.sh").read_text(encoding="utf-8")
+
+    assert 'printf \'%s\\n\' "$admin_password" | bcrypt_password_hash' in source
+    assert "bcrypt_password_hasher_available" in library
+    assert "htpasswd -niBC 12 ''" in library
+    assert "crypt.METHOD_BLOWFISH" in library
+
+
 def test_platform_shell_is_valid() -> None:
     result = subprocess.run(["bash", "-n", str(SCRIPT)], check=False, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

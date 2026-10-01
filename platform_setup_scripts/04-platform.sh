@@ -92,9 +92,11 @@ create_kargo_api_secret() {
     return 1
   fi
 
-  # -i reads the password from stdin, avoiding an argument-list disclosure.
+  # The selected bcrypt hasher reads the password from stdin, avoiding an
+  # argument-list disclosure. htpasswd is preferred; lib.sh supplies a
+  # Python crypt fallback for portable operator workstations.
   local password_hash token_key encoded_hash encoded_key
-  password_hash=$(printf '%s\n' "$admin_password" | htpasswd -niBC 12 '' | sed 's/^://')
+  password_hash=$(printf '%s\n' "$admin_password" | bcrypt_password_hash)
   token_key="${KARGO_TOKEN_SIGNING_KEY:-$(openssl rand -base64 48 | tr -d '=+/' | cut -c1-48)}"
   unset admin_password
   if [ "${#password_hash}" -lt 50 ] || [ "${#token_key}" -lt 32 ]; then

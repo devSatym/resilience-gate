@@ -29,7 +29,7 @@ require_env PROJECT_ID GITHUB_REPO REGION ZONE CLUSTER_NAME
 
 # Tool installation instructions are deliberately generic; no package manager
 # is assumed because bootstrap must work from Linux and macOS workstations.
-required_tools=(gcloud kubectl helm terraform python3 openssl htpasswd base64)
+required_tools=(gcloud kubectl helm terraform python3 openssl base64)
 missing=0
 for tool in "${required_tools[@]}"; do
   if command -v "$tool" >/dev/null 2>&1; then
@@ -40,6 +40,17 @@ for tool in "${required_tools[@]}"; do
   fi
 done
 [ "$missing" -eq 0 ] || { log_err "Install the missing tools and retry."; exit 1; }
+
+if bcrypt_password_hasher_available; then
+  if command -v htpasswd >/dev/null 2>&1; then
+    log_ok "htpasswd bcrypt hasher present"
+  else
+    log_ok "Python bcrypt-capable crypt fallback present"
+  fi
+else
+  log_err "A bcrypt password hasher is required (install htpasswd or use Python with bcrypt-capable crypt)"
+  exit 1
+fi
 
 if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
   log_err "A SHA-256 utility (sha256sum or shasum) is required for secret migration verification"

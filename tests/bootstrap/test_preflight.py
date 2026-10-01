@@ -46,7 +46,7 @@ exit 1
 """,
     )
     write_fake_tool(tools, "kubectl", f'if [[ "$*" == "config current-context" ]]; then echo "{context}"; fi')
-    for command in ("helm", "terraform", "openssl", "htpasswd", "base64"):
+    for command in ("helm", "terraform", "openssl", "base64"):
         write_fake_tool(tools, command, "exit 0")
 
     env = os.environ | {"CONFIG_FILE": str(config), "PATH": f"{tools}:{os.environ['PATH']}"}

@@ -51,6 +51,54 @@ require_command() {
   done
 }
 
+# Kargo accepts bcrypt hashes for its initial API password. Prefer Apache's
+# mature htpasswd implementation, but retain a portable fallback for operator
+# workstations where Python's system crypt backend supports bcrypt. The password
+# is read only from stdin and never appears in an argument list.
+bcrypt_password_hasher_available() {
+  if command -v htpasswd >/dev/null 2>&1; then
+    return 0
+  fi
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 -W ignore::DeprecationWarning - <<'PY' >/dev/null 2>&1
+import crypt
+
+raise SystemExit(0 if getattr(crypt, "METHOD_BLOWFISH", None) else 1)
+PY
+}
+
+bcrypt_password_hash() {
+  if command -v htpasswd >/dev/null 2>&1; then
+    htpasswd -niBC 12 '' | sed 's/^://'
+    return
+  fi
+
+  if ! bcrypt_password_hasher_available; then
+    log_err "A bcrypt password hasher is required (install htpasswd or use Python with bcrypt-capable crypt)"
+    return 1
+  fi
+
+  python3 -W ignore::DeprecationWarning -c '
+import crypt
+import sys
+
+password = sys.stdin.buffer.read()
+if password.endswith(b"\n"):
+    password = password[:-1]
+if not password:
+    raise SystemExit("Kargo admin password cannot be empty")
+try:
+    text = password.decode("utf-8")
+    salt = crypt.mksalt(crypt.METHOD_BLOWFISH, rounds=1 << 12)
+    encoded = crypt.crypt(text, salt)
+except (AttributeError, UnicodeDecodeError, ValueError) as exc:
+    raise SystemExit("Unable to create a bcrypt password hash") from exc
+if not encoded or not encoded.startswith("$2"):
+    raise SystemExit("System crypt backend did not produce a bcrypt password hash")
+sys.stdout.write(encoded)
+'
+}
+
 load_config() {
   local config_file="${1:-${CONFIG_FILE:-$SCRIPTS_DIR/config.env}}"
   if [ ! -f "$config_file" ]; then
