@@ -7,11 +7,14 @@ cd "$repo_root"
 
 python_bin=${PYTHON:-python3}
 
-if [[ -d helm/url-shortener ]]; then
+if [[ -d helm/url-shortener || -d helm/observability ]]; then
   command -v helm >/dev/null 2>&1 || {
-    echo "helm is required to validate helm/url-shortener" >&2
+    echo "helm is required to validate committed Helm charts" >&2
     exit 1
   }
+fi
+
+if [[ -d helm/url-shortener ]]; then
   helm dependency list helm/url-shortener
   for environment in dev staging prod; do
     values="helm/url-shortener/values-${environment}.yaml"
@@ -19,6 +22,12 @@ if [[ -d helm/url-shortener ]]; then
     helm template "url-shortener-${environment}" helm/url-shortener \
       --namespace "url-shortener-${environment}" --values "$values" >/dev/null
   done
+fi
+
+if [[ -d helm/observability ]]; then
+  helm dependency list helm/observability
+  helm lint helm/observability --strict
+  helm template observability helm/observability --namespace monitoring >/dev/null
 fi
 
 if [[ -d gke_terraform ]]; then

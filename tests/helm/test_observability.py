@@ -30,6 +30,14 @@ def test_chart_lock_pins_supported_telemetry_components() -> None:
         "loki": "7.3.0",
         "alloy": "1.12.1",
     }
+    assert {
+        archive.name
+        for archive in (CHART / "charts").glob("*.tgz")
+    } == {
+        "kube-prometheus-stack-91.4.0.tgz",
+        "loki-7.3.0.tgz",
+        "alloy-1.12.1.tgz",
+    }
 
 
 def test_metrics_and_logs_have_explicit_bounded_configuration() -> None:
