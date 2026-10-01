@@ -1,4 +1,4 @@
-# Run `make render-config` before applying this public GitOps manifest.
+# Generated from local config.env by render_config.py.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -9,7 +9,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: "{{GITHUB_REPOSITORY_URL}}"
+    repoURL: "https://github.com/devSatym/resilience-gate.git"
     targetRevision: main
     path: kubernetes/bootstrap
   destination:

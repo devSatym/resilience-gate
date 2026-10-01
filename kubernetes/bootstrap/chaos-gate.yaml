@@ -13,7 +13,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: "{{GITHUB_REPOSITORY_URL}}"
+    repoURL: "https://github.com/devSatym/resilience-gate.git"
     targetRevision: main
     path: kubernetes/chaos-experiments
   destination:

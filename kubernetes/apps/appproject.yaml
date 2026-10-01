@@ -12,7 +12,7 @@ metadata:
 spec:
   description: Rendered, digest-pinned Resilience Gate workload environments.
   sourceRepos:
-    - "{{GITHUB_REPOSITORY_URL}}"
+    - "https://github.com/devSatym/resilience-gate.git"
   destinations:
     - namespace: url-shortener-dev
       server: https://kubernetes.default.svc

@@ -14,7 +14,7 @@ spec:
     # CI's sha-* labels are discovery hints only. The promotion templates use
     # the Freight digest, never this mutable lookup tag, as deployment identity.
     - image:
-        repoURL: "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener"
+        repoURL: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/url-shortener"
         imageSelectionStrategy: NewestBuild
         allowTagsRegexes:
           - "^sha-[a-f0-9]{7,40}$"
@@ -23,7 +23,7 @@ spec:
     # The rendered env/* branches are outputs, never Freight sources. Only the
     # chart and environment values on main create a new source revision.
     - git:
-        repoURL: "{{GITHUB_REPOSITORY_URL}}"
+        repoURL: "https://github.com/devSatym/resilience-gate.git"
         branch: main
         includePaths:
           - helm/url-shortener

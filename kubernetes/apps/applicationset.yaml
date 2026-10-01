@@ -36,7 +36,7 @@ spec:
     spec:
       project: resilience-gate
       source:
-        repoURL: "{{GITHUB_REPOSITORY_URL}}"
+        repoURL: "https://github.com/devSatym/resilience-gate.git"
         targetRevision: "env/{{ .environment }}"
         path: .
         directory:

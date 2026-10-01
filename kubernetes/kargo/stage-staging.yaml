@@ -15,9 +15,9 @@ spec:
   # to the exact candidate being verified.
   vars:
     - name: gitopsRepo
-      value: "{{GITHUB_REPOSITORY_URL}}"
+      value: "https://github.com/devSatym/resilience-gate.git"
     - name: imageRepo
-      value: "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener"
+      value: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/url-shortener"
   requestedFreight:
     - origin:
         kind: Warehouse
@@ -29,9 +29,9 @@ spec:
     spec:
       vars:
         - name: gitopsRepo
-          value: "{{GITHUB_REPOSITORY_URL}}"
+          value: "https://github.com/devSatym/resilience-gate.git"
         - name: imageRepo
-          value: "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/url-shortener"
+          value: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/url-shortener"
         - name: sourcePath
           value: ./src
         - name: renderedPath
