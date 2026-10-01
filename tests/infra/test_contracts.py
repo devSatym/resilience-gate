@@ -84,6 +84,7 @@ class TerraformInfrastructureContracts(unittest.TestCase):
         # Compute Engine service account that modern projects leave unprivileged.
         self.assertIn('remove_default_node_pool = true', cluster)
         self.assertIn('service_account = google_service_account.gke_nodes.email', cluster)
+        self.assertIn('resource_labels = local.common_labels', cluster)
         self.assertIn('logging_variant = "DEFAULT"', cluster)
         self.assertIn(
             'google_project_iam_member.gke_nodes_default_node_service_account,',
@@ -97,6 +98,16 @@ class TerraformInfrastructureContracts(unittest.TestCase):
             'google_project_iam_member.gke_service_agent,',
             cluster,
         )
+        self.assertIn('goog-gke-node-pool-provisioning-model', cluster)
+
+    def test_gke_preserves_only_the_server_owned_provisioning_label(self) -> None:
+        gke = terraform_source("gke.tf")
+        cluster, node_pool = gke.split('resource "google_container_node_pool" "default"', 1)
+        server_label = 'node_config[0].resource_labels["goog-gke-node-pool-provisioning-model"]'
+
+        self.assertIn(server_label, cluster)
+        self.assertIn(server_label, node_pool)
+        self.assertNotIn("ignore_changes = [node_config[0].resource_labels]", gke)
 
     def test_gke_default_node_service_agent_binding_is_restored_declaratively(self) -> None:
         iam = terraform_source("iam.tf")

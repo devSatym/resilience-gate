@@ -18,10 +18,19 @@ resource "google_container_cluster" "gke_cluster" {
   # that account without the role GKE requires for node creation.
   node_config {
     service_account = google_service_account.gke_nodes.email
+    resource_labels = local.common_labels
 
     # Avoid serializing an empty logging variant object for the transient
     # initial pool by declaring GKE's documented default explicitly.
     logging_variant = "DEFAULT"
+  }
+
+  # GKE adds this provisioning-model label to every node pool. Ignore only
+  # that server-owned key so the labels declared above remain managed.
+  lifecycle {
+    ignore_changes = [
+      node_config[0].resource_labels["goog-gke-node-pool-provisioning-model"],
+    ]
   }
 
   deletion_protection   = var.deletion_protection
@@ -109,6 +118,14 @@ resource "google_container_node_pool" "default" {
     }
 
     resource_labels = local.common_labels
+  }
+
+  # GKE adds this provisioning-model label after creating the node pool. Keep
+  # all project labels managed while tolerating that server-owned key.
+  lifecycle {
+    ignore_changes = [
+      node_config[0].resource_labels["goog-gke-node-pool-provisioning-model"],
+    ]
   }
 
   depends_on = [
