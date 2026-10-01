@@ -40,11 +40,13 @@ spec:
           # Defense in depth: a target namespace must opt in with
           # chaos-mesh.org/inject=enabled before it can receive a fault.
           enableFilterNamespace: true
-          # This platform only needs bounded PodChaos workflows. Do not enable
-          # unrelated fault controllers by default.
+          # Chaos Mesh v2.8.2's controller bootstrap stops at the first
+          # disabled ``*-records`` controller. A selective list therefore
+          # prevents the later PodChaos pipeline from starting at all. Keep
+          # the chart default so PodChaos can reconcile; namespace opt-in and
+          # the gate's scoped RBAC still limit which faults can be created.
           enabledControllers:
-            - podchaos
-            - workflow
+            - "*"
 
         # Do not expose the privileged controller through the optional
         # dashboard or install its auxiliary DNS controller.

@@ -58,7 +58,7 @@ def test_chaos_mesh_requires_an_explicit_staging_namespace_opt_in() -> None:
     values = yaml.safe_load(application["spec"]["source"]["helm"]["values"])
     assert values["enableProfiling"] is False
     assert values["controllerManager"]["enableFilterNamespace"] is True
-    assert values["controllerManager"]["enabledControllers"] == ["podchaos", "workflow"]
+    assert values["controllerManager"]["enabledControllers"] == ["*"]
     assert values["dashboard"]["create"] is False
     assert values["dnsServer"]["create"] is False
     assert namespace["metadata"]["name"] == STAGING_NAMESPACE
