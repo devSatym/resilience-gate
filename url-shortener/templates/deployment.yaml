@@ -46,7 +46,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: url-shortener
-          image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/url-shortener@sha256:e8090ea3eec4c509eb1ece0a5b6bc840610908ef0826fd5bed44e736aa0459c7"
+          image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/url-shortener@sha256:a5beda836336de1677e27c3c2ff09a1ab27d9366040cd985c347d700de6f476b"
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
