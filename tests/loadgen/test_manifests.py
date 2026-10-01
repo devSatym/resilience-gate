@@ -11,6 +11,14 @@ import yaml
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 JOBS = REPOSITORY_ROOT / "kubernetes" / "jobs"
+SIGNER_TEMPLATE = (
+    REPOSITORY_ROOT
+    / "platform_setup_scripts"
+    / "templates"
+    / "kubernetes"
+    / "jobs"
+    / "radius-signer.yaml.tmpl"
+)
 DIGEST = re.compile(r"@sha256:[a-f0-9]{64}$")
 
 
@@ -41,10 +49,12 @@ def test_signer_uses_its_own_secret_boundary_and_safe_probes() -> None:
     pod = deployment["spec"]["template"]["spec"]
     container = pod["containers"][0]
 
-    assert container["image"] == (
-        "{{REGION}}-docker.pkg.dev/{{PROJECT_ID}}/{{GAR_REPO}}/"
-        "radius-signer@{{SIGNER_DIGEST}}"
-    )
+    # Templates remain portable; the generated workload must contain a fully
+    # rendered immutable digest rather than unresolved public identifiers.
+    assert 'radius-signer@{{SIGNER_DIGEST}}' in SIGNER_TEMPLATE.read_text(encoding="utf-8")
+    assert "/radius-signer@sha256:" in container["image"]
+    assert DIGEST.search(container["image"])
+    assert "{{" not in container["image"]
     assert ":latest" not in container["image"]
     assert "ajprojectplatform" not in container["image"]
     assert pod["automountServiceAccountToken"] is False

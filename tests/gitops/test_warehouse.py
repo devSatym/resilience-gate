@@ -12,11 +12,15 @@ import yaml
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WAREHOUSE_PATH = REPO_ROOT / "kubernetes" / "kargo" / "warehouse.yaml"
+WAREHOUSE_TEMPLATE_PATH = (
+    REPO_ROOT / "platform_setup_scripts" / "templates" / "kubernetes" / "kargo" / "warehouse.yaml.tmpl"
+)
 
 
 def warehouse() -> dict[str, object]:
-    return yaml.safe_load(WAREHOUSE_PATH.read_text(encoding="utf-8"))
+    # The generated manifest contains the selected public project identity;
+    # this portable contract deliberately checks the source template.
+    return yaml.safe_load(WAREHOUSE_TEMPLATE_PATH.read_text(encoding="utf-8"))
 
 
 def test_warehouse_combines_chart_revision_and_digest_backed_image_freight() -> None:
@@ -46,7 +50,7 @@ def test_warehouse_combines_chart_revision_and_digest_backed_image_freight() -> 
 
 
 def test_warehouse_has_no_committed_identity_or_mutable_deployment_reference() -> None:
-    contents = WAREHOUSE_PATH.read_text(encoding="utf-8")
+    contents = WAREHOUSE_TEMPLATE_PATH.read_text(encoding="utf-8")
 
     assert "github.com/" not in contents
     assert "amoghjay" not in contents

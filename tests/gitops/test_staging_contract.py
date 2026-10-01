@@ -9,6 +9,12 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STAGING_PATH = REPO_ROOT / "kubernetes" / "kargo" / "stage-staging.yaml"
+STAGING_TEMPLATE_PATH = (
+    REPO_ROOT / "platform_setup_scripts" / "templates" / "kubernetes" / "kargo" / "stage-staging.yaml.tmpl"
+)
+ANALYSIS_TEMPLATE_PATH = (
+    REPO_ROOT / "platform_setup_scripts" / "templates" / "kubernetes" / "kargo" / "analysistemplate.yaml.tmpl"
+)
 PROJECT_CONFIG_PATH = REPO_ROOT / "kubernetes" / "kargo" / "projectconfig.yaml"
 
 
@@ -44,7 +50,9 @@ def test_staging_accepts_only_development_freight_and_requires_manual_promotion(
 
 
 def test_staging_renders_the_freight_digest_and_requires_the_immutable_chaos_gate() -> None:
-    stage = load(STAGING_PATH)
+    # Public rendered manifests deliberately contain the selected deployment
+    # identity. The portable contract belongs to the source template instead.
+    stage = load(STAGING_TEMPLATE_PATH)
     stage_vars = {item["name"]: item["value"] for item in stage["spec"]["vars"]}
     template = stage["spec"]["promotionTemplate"]["spec"]
     steps = template["steps"]
@@ -80,15 +88,14 @@ def test_staging_renders_the_freight_digest_and_requires_the_immutable_chaos_gat
         ],
     }
 
-    contents = STAGING_PATH.read_text(encoding="utf-8")
+    contents = STAGING_TEMPLATE_PATH.read_text(encoding="utf-8")
     assert "sources:\n        direct:" not in contents
     assert "image.tag" not in contents
     assert "mainnet" not in contents
 
 
 def test_chaos_gate_job_uses_a_digest_and_cannot_change_its_scripts_at_runtime() -> None:
-    analysis_path = REPO_ROOT / "kubernetes" / "kargo" / "analysistemplate.yaml"
-    templates = list(yaml.safe_load_all(analysis_path.read_text(encoding="utf-8")))
+    templates = list(yaml.safe_load_all(ANALYSIS_TEMPLATE_PATH.read_text(encoding="utf-8")))
     gate = next(template for template in templates if template["metadata"]["name"] == "chaos-gate")
     metric = gate["spec"]["metrics"][0]
     job = metric["provider"]["job"]["spec"]
