@@ -6,10 +6,9 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 7.22"
     }
-    # v6.11+ always serializes control-plane endpoint fields that this GKE API
-    # target rejects. Limit the compatibility provider to the two GKE
-    # resources below; the rest of the foundation remains on the current GA
-    # provider.
+    # Pin only the cluster-creation resources to avoid the v6.11+
+    # control-plane endpoint serialization. The rest of the foundation stays
+    # on the current GA provider.
     google-beta = {
       source  = "hashicorp/google-beta"
       version = "= 6.10.0"
