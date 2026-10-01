@@ -43,7 +43,7 @@ spec:
         - name: radius-signer
           # Rendered from the verified signer artifact identity. The digest
           # syntax prevents a mutable tag from silently changing the workload.
-          image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/radius-signer@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+          image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/radius-signer@sha256:3e4749d4e9aa7820a7d1b0ab5dfec522f8591552c466ec744038960ea2f077aa"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
