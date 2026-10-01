@@ -94,6 +94,14 @@ def test_validation_workflow_is_credential_free_and_has_platform_tooling() -> No
     )
 
 
+def test_shared_validation_workflows_install_the_signer_test_environment() -> None:
+    for name in ("validate.yaml", "build-push.yaml", "build-radius-signer.yaml"):
+        _, raw = workflow(name)
+
+        assert "./scripts/validate.sh" in raw
+        assert "signer/requirements.lock" in raw
+
+
 def test_gate_runner_is_built_from_reviewed_scripts_not_a_runtime_configmap() -> None:
     dockerfile = (
         REPOSITORY_ROOT / "docker" / "gate-runner" / "Dockerfile"
