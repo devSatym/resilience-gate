@@ -42,10 +42,70 @@ def write_config(tmp_path: Path) -> Path:
     return config
 
 
-def fake_environment(tmp_path: Path) -> tuple[dict[str, str], Path, Path]:
+def scorecard_line(experiment: str) -> str:
+    return json.dumps(
+        {
+            "schema_version": "resilience-gate.scorecard/v1",
+            "experiment": experiment,
+            "verdict": "pass",
+            "generated_at": "2026-10-01T12:00:00Z",
+            "release": {
+                "revision": "abcdef0",
+                "image_digest": "sha256:" + "a" * 64,
+                "run_id": "gate-run-1",
+            },
+            "window": None,
+            "checks": [
+                {
+                    "id": "check",
+                    "name": "check",
+                    "verdict": "pass",
+                    "observed": 1,
+                    "operator": ">=",
+                    "threshold": 1,
+                    "unit": "count",
+                    "expression": "up",
+                    "query_kind": "instant",
+                    "sample_count": 1,
+                    "reason": None,
+                    "evidence_error": None,
+                }
+            ],
+        },
+        separators=(",", ":"),
+    )
+
+
+def fake_environment(
+    tmp_path: Path,
+    *,
+    fail_gate_exec: bool = False,
+    log_scorecards: tuple[str, ...] | None = None,
+) -> tuple[dict[str, str], Path, Path]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     calls = tmp_path / "calls.log"
+    all_scorecards = (
+        "postgres-pod-failure",
+        "redis-pod-failure",
+        "signer-pod-failure",
+    )
+    selected_scorecards = all_scorecards if log_scorecards is None else log_scorecards
+    scorecard_logs = "\n".join(
+        f"printf '%s\\n' '[pod/gate-pod-1/chaos-gate] {scorecard_line(experiment)}'"
+        for experiment in selected_scorecards
+    )
+    scorecard_exec = "\n".join(
+        "\n".join(
+            (
+                f'if [[ "$args" == *"{experiment}.json"* ]]; then',
+                f"  printf '%s\\n' '{scorecard_line(experiment)}'",
+                "  exit 0",
+                "fi",
+            )
+        )
+        for experiment in all_scorecards
+    )
     write_executable(
         bin_dir / "kubectl",
         f"""
@@ -108,10 +168,14 @@ if [[ "$args" == *"get pod gate-pod-1 -o yaml"* ]]; then
   printf 'apiVersion: v1\\nkind: Pod\\nmetadata:\\n  name: gate-pod-1\\n'
   exit 0
 fi
-if [[ "$args" == *"logs pod/gate-pod-1"* ]]; then echo 'gate log: verdict available'; exit 0; fi
-if [[ "$args" == *"exec gate-pod-1"* ]]; then
-  printf '{{"experiment":"scorecard","verdict":"pass"}}\\n'
+if [[ "$args" == *"logs pod/gate-pod-1"* ]]; then
+{scorecard_logs}
   exit 0
+fi
+if [[ "$args" == *"exec gate-pod-1"* ]]; then
+  if [[ "$FAIL_GATE_EXEC" == "1" ]]; then exit 1; fi
+{scorecard_exec}
+  exit 1
 fi
 if [[ "$args" == *"get stage staging"* ]]; then exit 0; fi
 if [[ "$args" == *"get analysistemplate chaos-gate"* ]]; then exit 0; fi
@@ -127,7 +191,10 @@ printf 'kargo %s\\n' "$*" >> {calls}
 exit 0
 """,
     )
-    env = os.environ | {"PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    env = os.environ | {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "FAIL_GATE_EXEC": "1" if fail_gate_exec else "0",
+    }
     return env, calls, write_config(tmp_path)
 
 
@@ -284,6 +351,143 @@ def test_collector_writes_sanitized_bundle_and_release_metadata(tmp_path: Path) 
         env=env,
     )
     assert validation.returncode == 0, validation.stderr
+
+
+def test_collector_recovers_completed_gate_scorecards_from_sanitized_logs(tmp_path: Path) -> None:
+    env, calls, config = fake_environment(tmp_path, fail_gate_exec=True)
+    output_root = tmp_path / "evidence-output"
+    digest = "sha256:" + "a" * 64
+    result = run(
+        [
+            "bash",
+            str(COLLECTOR),
+            "--collect",
+            "--acknowledge-owned-testnet-lab",
+            "--config",
+            str(config),
+            "--output-root",
+            str(output_root),
+            "--scenario",
+            "chaos-gate",
+            "--status",
+            "pass",
+            "--run-id",
+            "gate-log-fallback-1",
+            "--analysis-run",
+            "analysis-run-1",
+            "--gate-job",
+            "gate-job-1",
+            "--repository-revision",
+            "abcdef0",
+            "--chart-revision",
+            "abcdef0",
+            "--release-image-digest",
+            digest,
+            "--gate-runner-image-digest",
+            digest,
+            "--signer-image-digest",
+            digest,
+            "--loadgen-image-digest",
+            digest,
+        ],
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    bundle = output_root / "chaos-gate" / "gate-log-fallback-1"
+    for experiment in (
+        "postgres-pod-failure",
+        "redis-pod-failure",
+        "signer-pod-failure",
+    ):
+        scorecard = json.loads((bundle / "scorecards" / f"{experiment}.json").read_text(encoding="utf-8"))
+        assert scorecard["experiment"] == experiment
+        assert scorecard["verdict"] == "pass"
+    recorded = calls.read_text(encoding="utf-8")
+    assert "kubectl -n resilience-gate exec gate-pod-1" in recorded
+    assert "kubectl -n resilience-gate logs pod/gate-pod-1 --all-containers=true --prefix=true" in recorded
+
+
+def test_collector_refuses_missing_completed_gate_scorecard(tmp_path: Path) -> None:
+    env, _calls, config = fake_environment(
+        tmp_path,
+        fail_gate_exec=True,
+        log_scorecards=("postgres-pod-failure", "redis-pod-failure"),
+    )
+    output_root = tmp_path / "evidence-output"
+    digest = "sha256:" + "a" * 64
+    run_id = "gate-log-fallback-missing"
+    result = run(
+        [
+            "bash",
+            str(COLLECTOR),
+            "--collect",
+            "--acknowledge-owned-testnet-lab",
+            "--config",
+            str(config),
+            "--output-root",
+            str(output_root),
+            "--scenario",
+            "chaos-gate",
+            "--status",
+            "pass",
+            "--run-id",
+            run_id,
+            "--analysis-run",
+            "analysis-run-1",
+            "--gate-job",
+            "gate-job-1",
+            "--repository-revision",
+            "abcdef0",
+            "--chart-revision",
+            "abcdef0",
+            "--release-image-digest",
+            digest,
+            "--gate-runner-image-digest",
+            digest,
+            "--signer-image-digest",
+            digest,
+            "--loadgen-image-digest",
+            digest,
+        ],
+        env=env,
+    )
+
+    assert result.returncode == 2
+    assert "could not recover scorecard signer-pod-failure" in result.stderr
+    assert not (output_root / "chaos-gate" / run_id).exists()
+    assert not list(output_root.glob(".collect-*"))
+
+
+def test_scorecard_extractor_accepts_prefixed_logs_and_rejects_ambiguous_matches(tmp_path: Path) -> None:
+    source = tmp_path / "gate.log"
+    output = tmp_path / "scorecard.json"
+    prefix = "[pod/gate-pod-1/chaos-gate] "
+    source.write_text(prefix + scorecard_line("postgres-pod-failure") + "\n", encoding="utf-8")
+
+    command = [
+        os.environ.get("PYTHON", "python3"),
+        str(EVIDENCE_UTILITY),
+        "extract-scorecard",
+        "--input",
+        str(source),
+        "--experiment",
+        "postgres-pod-failure",
+        "--output",
+        str(output),
+    ]
+    accepted = run(command)
+    assert accepted.returncode == 0, accepted.stderr
+    assert json.loads(output.read_text(encoding="utf-8"))["experiment"] == "postgres-pod-failure"
+
+    source.write_text(
+        "\n".join((prefix + scorecard_line("postgres-pod-failure"), prefix + scorecard_line("postgres-pod-failure")))
+        + "\n",
+        encoding="utf-8",
+    )
+    ambiguous = run(command)
+    assert ambiguous.returncode == 2
+    assert "found 2" in ambiguous.stderr
 
 
 def test_collector_maps_baseline_evidence_to_development_without_gate_artifacts(tmp_path: Path) -> None:

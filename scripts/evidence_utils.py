@@ -33,6 +33,7 @@ RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$")
 REVISION_PATTERN = re.compile(r"^(?:[0-9a-f]{7,64}|unavailable)$")
 DIGEST_PATTERN = re.compile(r"^(?:sha256:[0-9a-f]{64}|unavailable)$")
 RELATIVE_FILE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+SCORECARD_SCHEMA_VERSION = "resilience-gate.scorecard/v1"
 
 # Keep this list broad on purpose. The utility is used for evidence, not for
 # diagnostics where retaining a field name is more valuable than safety.
@@ -193,6 +194,58 @@ def sanitize(args: argparse.Namespace) -> int:
     return 0
 
 
+def extract_scorecard(args: argparse.Namespace) -> int:
+    """Recover one complete scorecard from sanitized gate-container logs.
+
+    Kubernetes prefixes multi-container logs with pod and container metadata.
+    Scorecards themselves are emitted as one JSON object per line, so scan from
+    the first JSON-object marker rather than assuming an unprefixed log line.
+    Requiring exactly one structurally complete match prevents a stale or
+    ambiguous log excerpt from being presented as evidence.
+    """
+
+    matches: list[dict[str, Any]] = []
+    for line in read_text(args.input).splitlines():
+        marker = line.find("{")
+        if marker < 0:
+            continue
+        try:
+            payload = json.loads(line[marker:])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("schema_version") != SCORECARD_SCHEMA_VERSION:
+            continue
+        if payload.get("experiment") != args.experiment:
+            continue
+        if payload.get("verdict") not in {"pass", "fail"}:
+            continue
+        checks = payload.get("checks")
+        release = payload.get("release")
+        if not isinstance(checks, list) or not checks:
+            continue
+        if not isinstance(release, dict) or any(
+            not isinstance(release.get(field), str) or not release[field]
+            for field in ("revision", "image_digest", "run_id")
+        ):
+            continue
+        matches.append(payload)
+
+    if len(matches) != 1:
+        raise ContractError(
+            f"expected exactly one complete {args.experiment} scorecard in the sanitized log; "
+            f"found {len(matches)}"
+        )
+
+    destination = Path(args.output)
+    if destination.is_symlink():
+        raise ContractError(f"scorecard output must not be a symlink: {destination}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(json.dumps(matches[0], indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return 0
+
+
 def expect_string(value: Any, name: str) -> str:
     if not isinstance(value, str):
         raise ContractError(f"{name} must be a string")
@@ -347,6 +400,18 @@ def parser() -> argparse.ArgumentParser:
     redact.add_argument("--output", required=True)
     redact.add_argument("--report", help="write one redaction category per line")
     redact.set_defaults(handler=sanitize)
+
+    scorecard = commands.add_parser(
+        "extract-scorecard", help="recover one complete scorecard from sanitized gate logs"
+    )
+    scorecard.add_argument("--input", required=True, help="sanitized gate log file")
+    scorecard.add_argument(
+        "--experiment",
+        required=True,
+        choices=("postgres-pod-failure", "redis-pod-failure", "signer-pod-failure"),
+    )
+    scorecard.add_argument("--output", required=True)
+    scorecard.set_defaults(handler=extract_scorecard)
 
     validation = commands.add_parser("validate", help="validate run metadata")
     validation.add_argument("--metadata", required=True)
