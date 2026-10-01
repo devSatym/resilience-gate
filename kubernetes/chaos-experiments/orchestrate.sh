@@ -137,7 +137,10 @@ validate_settings() {
 lease_document() {
   local resource_version="${1:-}"
   local observed_at
-  observed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  # coordination.k8s.io/v1 Lease timestamps are MicroTime values. Kubernetes
+  # validates them strictly, so retain an explicit six-digit fractional part
+  # instead of emitting RFC3339 seconds-only timestamps.
+  observed_at=$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)
   cat <<EOF
 apiVersion: coordination.k8s.io/v1
 kind: Lease

@@ -104,6 +104,38 @@ exit 99
     assert "delete lease chaos-gate-runner" in calls
 
 
+def test_gate_lease_uses_kubernetes_microtime_timestamps(tmp_path: Path) -> None:
+    """The API rejects seconds-only values for Lease MicroTime fields."""
+    state = tmp_path / "state"
+    state.mkdir()
+    env, calls_path = base_environment(
+        tmp_path,
+        f"""
+args="$*"
+if [[ "$args" == *" create -f -"* ]]; then
+  manifest="$(cat)"
+  printf '%s\\n' "$manifest" | grep -Eq '^  acquireTime: [0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}T[0-9]{{2}}:[0-9]{{2}}:[0-9]{{2}}\\.000000Z$' || exit 1
+  printf '%s\\n' "$manifest" | grep -Eq '^  renewTime: [0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}T[0-9]{{2}}:[0-9]{{2}}:[0-9]{{2}}\\.000000Z$' || exit 1
+  exit 0
+fi
+if [[ "$args" == *" get workflow -l resilience-gate.io/gate=chaos"* ]]; then exit 0; fi
+if [[ "$args" == *" get endpointslice "* ]]; then exit 0; fi
+if [[ "$args" == *" delete lease chaos-gate-runner "* ]]; then touch {state}/released; exit 0; fi
+if [[ "$args" == *" get lease chaos-gate-runner "* ]]; then [[ -f {state}/released ]] && exit 1; exit 0; fi
+exit 99
+""",
+    )
+
+    result = run_orchestrator(env)
+
+    assert result.returncode == 1
+    assert "no ready endpoint" in result.stderr
+    assert "could not inspect existing gate Lease" not in result.stderr
+    calls = calls_path.read_text(encoding="utf-8")
+    assert "create -f -" in calls
+    assert "get endpointslice" in calls
+
+
 def test_loadgen_startup_timeout_cleans_the_new_run_without_scoring(tmp_path: Path) -> None:
     state = tmp_path / "state"
     state.mkdir()
