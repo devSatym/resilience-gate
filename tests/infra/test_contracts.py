@@ -68,6 +68,13 @@ class TerraformInfrastructureContracts(unittest.TestCase):
         self.assertIn('mode = "GKE_METADATA"', gke)
         self.assertIn('disable-legacy-endpoints = "true"', gke)
 
+    def test_gke_monitoring_uses_current_supported_components(self) -> None:
+        gke = terraform_source("gke.tf")
+        monitoring = re.search(r"monitoring_config \{(.*?)^  \}", gke, re.MULTILINE | re.DOTALL)
+
+        self.assertIsNotNone(monitoring)
+        self.assertIn('enable_components = ["SYSTEM_COMPONENTS"]', monitoring.group(1))
+
     def test_cluster_initial_pool_uses_the_dedicated_node_identity(self) -> None:
         gke = terraform_source("gke.tf")
         cluster, _ = gke.split('resource "google_container_node_pool" "default"', 1)

@@ -46,7 +46,10 @@ resource "google_container_cluster" "gke_cluster" {
   }
 
   monitoring_config {
-    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+    # WORKLOADS is a legacy monitoring component that GKE no longer accepts
+    # for current releases. The platform's Prometheus stack continues to
+    # collect workload metrics; keep GKE's supported system metrics enabled.
+    enable_components = ["SYSTEM_COMPONENTS"]
   }
 
   resource_labels = local.common_labels
