@@ -14,6 +14,30 @@ resource "google_project_iam_member" "gke_nodes_default_node_service_account" {
   member  = "serviceAccount:${google_service_account.gke_nodes.email}"
 }
 
+# GKE 1.33+ uses a Google-managed node service agent for node logging and
+# monitoring. The GKE API normally creates and binds it when enabled, but the
+# binding can be removed independently and then makes cluster creation fail.
+# Derive its stable project-number address instead of hard-coding a target.
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
+resource "google_project_iam_member" "gke_service_agent" {
+  project = var.project_id
+  role    = "roles/container.serviceAgent"
+  member  = "serviceAccount:service-${data.google_project.current.number}@container-engine-robot.iam.gserviceaccount.com"
+
+  depends_on = [google_project_service.container]
+}
+
+resource "google_project_iam_member" "gke_default_node_service_agent" {
+  project = var.project_id
+  role    = "roles/container.defaultNodeServiceAgent"
+  member  = "serviceAccount:service-${data.google_project.current.number}@gcp-sa-gkenode.iam.gserviceaccount.com"
+
+  depends_on = [google_project_service.container]
+}
+
 resource "google_project_iam_member" "gke_nodes_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"

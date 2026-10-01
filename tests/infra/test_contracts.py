@@ -81,6 +81,30 @@ class TerraformInfrastructureContracts(unittest.TestCase):
             'google_project_iam_member.gke_nodes_default_node_service_account,',
             cluster,
         )
+        self.assertIn(
+            'google_project_iam_member.gke_default_node_service_agent,',
+            cluster,
+        )
+        self.assertIn(
+            'google_project_iam_member.gke_service_agent,',
+            cluster,
+        )
+
+    def test_gke_default_node_service_agent_binding_is_restored_declaratively(self) -> None:
+        iam = terraform_source("iam.tf")
+
+        self.assertIn('data "google_project" "current"', iam)
+        self.assertIn('roles/container.serviceAgent', iam)
+        self.assertIn(
+            'service-${data.google_project.current.number}@container-engine-robot.iam.gserviceaccount.com',
+            iam,
+        )
+        self.assertIn('roles/container.defaultNodeServiceAgent', iam)
+        self.assertIn(
+            'service-${data.google_project.current.number}@gcp-sa-gkenode.iam.gserviceaccount.com',
+            iam,
+        )
+        self.assertIn('depends_on = [google_project_service.container]', iam)
 
     def test_github_publisher_is_bound_to_repository_ref_and_event(self) -> None:
         oidc = terraform_source("github-oidc.tf")

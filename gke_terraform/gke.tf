@@ -49,6 +49,8 @@ resource "google_container_cluster" "gke_cluster" {
     google_project_service.compute,
     google_project_service.container,
     google_project_iam_member.gke_nodes_default_node_service_account,
+    google_project_iam_member.gke_service_agent,
+    google_project_iam_member.gke_default_node_service_agent,
   ]
 }
 
