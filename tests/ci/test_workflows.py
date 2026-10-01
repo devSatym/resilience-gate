@@ -41,6 +41,7 @@ def test_pull_request_validation_never_receives_publish_credentials() -> None:
         assert validate["permissions"] == {"contents": "read"}
         assert validate["permissions"].get("id-token") is None
         assert "github.event_name == 'push'" in publish["if"]
+        assert "github.event_name == 'workflow_dispatch'" in publish["if"]
         assert "github.ref == 'refs/heads/main'" in publish["if"]
         assert publish["permissions"] == {"contents": "read", "id-token": "write"}
         assert "google-github-actions/auth@v2" not in str(validate)
@@ -48,6 +49,7 @@ def test_pull_request_validation_never_receives_publish_credentials() -> None:
         assert "git push" not in raw
         assert "ajprojectplatform" not in raw
         assert "amoghjay" not in raw
+        assert "workflow_dispatch:" in raw
 
 
 def test_delivery_waits_for_validation_and_records_a_verified_digest() -> None:

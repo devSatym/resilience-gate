@@ -10,6 +10,7 @@ on:
     paths:
       - "signer/**"
       - ".github/workflows/build-radius-signer.yaml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -47,7 +48,7 @@ jobs:
   publish:
     name: Publish signer image by OIDC
     needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: read

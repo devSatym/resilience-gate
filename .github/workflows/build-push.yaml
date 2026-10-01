@@ -10,6 +10,7 @@ on:
     paths:
       - "app/**"
       - ".github/workflows/build-push.yaml"
+  workflow_dispatch:
 
 # A pull request gets only read access. The publish job receives OIDC only
 # after its validation dependency succeeds on the trusted main branch.
@@ -45,7 +46,7 @@ jobs:
   publish:
     name: Publish application image by OIDC
     needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
