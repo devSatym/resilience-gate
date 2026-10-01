@@ -16,6 +16,11 @@ resource "google_container_cluster" "gke_cluster" {
   # that account without the role GKE requires for node creation.
   node_config {
     service_account = google_service_account.gke_nodes.email
+
+    # The provider otherwise serializes an empty logging variant object for the
+    # transient initial pool. GKE rejects that zero-value enum at cluster
+    # creation, so declare the documented default explicitly.
+    logging_variant = "DEFAULT"
   }
 
   deletion_protection   = var.deletion_protection
@@ -29,6 +34,13 @@ resource "google_container_cluster" "gke_cluster" {
   ip_allocation_policy {
     cluster_secondary_range_name  = local.cluster_secondary_range
     services_secondary_range_name = local.svc_secondary_range
+  }
+
+  # GKE's Private Service Connect default is the cluster primary subnet. Set
+  # that existing subnet explicitly because the current provider otherwise
+  # force-sends this API field as an invalid empty string.
+  private_cluster_config {
+    private_endpoint_subnetwork = google_compute_subnetwork.gke_subnet.id
   }
 
   workload_identity_config {

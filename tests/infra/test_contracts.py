@@ -77,6 +77,11 @@ class TerraformInfrastructureContracts(unittest.TestCase):
         # Compute Engine service account that modern projects leave unprivileged.
         self.assertIn('remove_default_node_pool = true', cluster)
         self.assertIn('service_account = google_service_account.gke_nodes.email', cluster)
+        self.assertIn('logging_variant = "DEFAULT"', cluster)
+        self.assertIn(
+            'private_endpoint_subnetwork = google_compute_subnetwork.gke_subnet.id',
+            cluster,
+        )
         self.assertIn(
             'google_project_iam_member.gke_nodes_default_node_service_account,',
             cluster,
