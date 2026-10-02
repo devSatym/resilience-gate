@@ -40,9 +40,11 @@ class ScriptedReader:
         self.instant = instant
         self.range = range_
         self.queries: list[tuple[str, str]] = []
+        self.instant_query_times: list[datetime] = []
 
     def query_instant(self, expression: str, at: datetime) -> object:
         self.queries.append(("instant", expression))
+        self.instant_query_times.append(at)
         assert self.instant, f"unexpected instant query: {expression}"
         result = self.instant.pop(0)
         if isinstance(result, Exception):
@@ -98,9 +100,12 @@ def evaluate_with_complete_evidence(baseline_scorer: ModuleType) -> tuple[object
         "2026-10-02T00:00:00Z", "2026-10-02T00:01:30Z"
     )
     reader = ScriptedReader(
-        instant=[instant(baseline_scorer, window.end, 30), instant(baseline_scorer, window.end, 0)],
+        instant=[
+            instant(baseline_scorer, window.end, 30),
+            instant(baseline_scorer, window.end, 0),
+            instant(baseline_scorer, window.end, 0.2),
+        ],
         range_=[
-            range_(baseline_scorer, window, (0.08, 0.1, 0.12, 0.16, 0.2)),
             range_(baseline_scorer, window, (1, 1, 1, 1, 1)),
             range_(baseline_scorer, window, (1, 1, 1, 1, 1)),
         ],
@@ -144,6 +149,10 @@ def test_complete_fresh_baseline_telemetry_passes(baseline_scorer: ModuleType) -
         "redis-ready",
         "release-identity",
     ]
+    latency = next(check for check in payload["checks"] if check["id"] == "root-get-p95-latency")
+    assert latency["query_kind"] == "instant"
+    assert latency["observed"] == 0.2
+    assert reader.instant_query_times[2] == datetime(2026, 10, 2, 0, 1, 30, tzinfo=timezone.utc)
     assert any('handler="/", method="GET"' in expression for _, expression in reader.queries)
     assert all(NAMESPACE in expression for _, expression in reader.queries)
 
@@ -153,6 +162,7 @@ def test_missing_and_stale_evidence_fail_closed(baseline_scorer: ModuleType) -> 
         "2026-10-02T00:00:00Z", "2026-10-02T00:01:30Z"
     )
     missing = baseline_scorer.chaos.MissingEvidenceError("no matching traffic series")
+    nonfinite = baseline_scorer.chaos.NonFiniteEvidenceError("p95 was NaN")
     stale_samples = tuple(
         baseline_scorer.chaos.Sample(
             timestamp=window.start + timedelta(seconds=10 * index), value=0.1
@@ -165,10 +175,13 @@ def test_missing_and_stale_evidence_fail_closed(baseline_scorer: ModuleType) -> 
         series=(baseline_scorer.chaos.TimeSeries(labels={}, samples=stale_samples),),
     )
     reader = ScriptedReader(
-        instant=[missing, instant(baseline_scorer, window.end, 0)],
+        instant=[
+            missing,
+            instant(baseline_scorer, window.end, 0),
+            nonfinite,
+        ],
         range_=[
             stale,
-            range_(baseline_scorer, window, (1, 1, 1, 1, 1)),
             range_(baseline_scorer, window, (1, 1, 1, 1, 1)),
         ],
     )
@@ -186,7 +199,8 @@ def test_missing_and_stale_evidence_fail_closed(baseline_scorer: ModuleType) -> 
     checks = {check.identifier: check for check in card.checks}
     assert card.verdict == "fail"
     assert checks["root-get-traffic"].evidence_error == "missing_evidence"
-    assert checks["root-get-p95-latency"].evidence_error == "stale_evidence"
+    assert checks["root-get-p95-latency"].evidence_error == "non_finite_evidence"
+    assert checks["postgres-ready"].evidence_error == "stale_evidence"
 
 
 def test_window_and_identity_inputs_are_strict(baseline_scorer: ModuleType) -> None:

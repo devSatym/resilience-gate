@@ -149,13 +149,18 @@ BASELINE_CHECKS = (
     ),
     chaos.CheckDefinition(
         identifier="root-get-p95-latency",
-        name="GET / p95 latency stayed below the baseline bound",
+        name="GET / p95 latency over the final one-minute traffic interval stayed below the baseline bound",
         expression=(
             'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket'
             '{{namespace="{namespace}", handler="/", method="GET"}}[1m])) by (le))'
         ),
-        query_kind="range",
-        aggregation="max",
+        # The baseline begins from an idle service. The first point of a
+        # range-vector rate can therefore be NaN before a full one-minute
+        # traffic interval exists. Evaluate one fresh scalar at the completed
+        # window end instead; it covers the final 60 seconds of the bounded
+        # run and still fails closed on missing, stale, or non-finite data.
+        query_kind="instant",
+        aggregation="value",
         operator="<",
         threshold=MAX_ROOT_GET_P95_SECONDS,
         unit="seconds",
