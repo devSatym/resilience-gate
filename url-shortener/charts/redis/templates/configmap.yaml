@@ -1,0 +1,37 @@
+---
+# Source: url-shortener/charts/redis/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: url-shortener-prod-redis-configuration
+  namespace: "url-shortener-prod"
+  labels:
+    app.kubernetes.io/instance: url-shortener-prod
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 8.6.1
+    helm.sh/chart: redis-25.3.5
+data:
+  redis.conf: |-
+    # User-supplied common configuration:
+    # Enable ReJSON y Redisearch
+    loadmodule /opt/bitnami/redis/lib/redis/modules/redisearch.so
+    loadmodule /opt/bitnami/redis/lib/redis/modules/rejson.so
+    # Enable AOF https://redis.io/topics/persistence#append-only-file
+    appendonly yes
+    # Disable RDB persistence, AOF persistence already enabled.
+    save ""
+    # End of common configuration
+  master.conf: |-
+    dir /data
+    # User-supplied master configuration:
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    # End of master configuration
+  replica.conf: |-
+    dir /data
+    # User-supplied replica configuration:
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    # End of replica configuration
+  users.acl: |-

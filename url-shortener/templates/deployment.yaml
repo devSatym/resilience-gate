@@ -1,0 +1,116 @@
+---
+# Source: url-shortener/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: url-shortener-prod
+  labels:
+    helm.sh/chart: url-shortener-0.1.0
+    app.kubernetes.io/name: url-shortener
+    app.kubernetes.io/instance: url-shortener-prod
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 120
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: url-shortener
+      app.kubernetes.io/instance: url-shortener-prod
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: url-shortener
+        app.kubernetes.io/instance: url-shortener-prod
+        app.kubernetes.io/version: "0.1.0"
+        app: url-shortener
+      annotations:
+        checksum/config: 972c23fcb4bf097736ae3d34803ef75a9d30deecabe26ecac11a13564eb4f6e5
+        checksum/external-secret: e2362c2907a65999a90c2acad6f7393fc7b6eba8c75d1e02313a932094ed9ed7
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: url-shortener-prod
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: url-shortener
+                    app.kubernetes.io/instance: url-shortener-prod
+                topologyKey: "kubernetes.io/hostname"
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: "kubernetes.io/hostname"
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: url-shortener
+              app.kubernetes.io/instance: url-shortener-prod
+      containers:
+        - name: url-shortener
+          image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/url-shortener@sha256:a5beda836336de1677e27c3c2ff09a1ab27d9366040cd985c347d700de6f476b"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: url-shortener-prod-config
+            - secretRef:
+                name: url-shortener-prod-credentials
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 6
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 256Mi
