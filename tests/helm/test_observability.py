@@ -87,6 +87,20 @@ def test_metrics_and_logs_have_explicit_bounded_configuration() -> None:
     }
 
 
+def test_gke_coredns_monitor_targets_the_managed_metrics_port() -> None:
+    service = next(
+        document
+        for document in render_chart()
+        if document["kind"] == "Service"
+        and document["metadata"]["name"] == "observability-kube-prometh-coredns"
+    )
+    metrics_port = next(
+        port for port in service["spec"]["ports"] if port["name"] == "http-metrics"
+    )
+    assert metrics_port["port"] == 9153
+    assert metrics_port["targetPort"] == "metrics"
+
+
 def test_service_monitors_and_dashboards_cover_the_application_contract() -> None:
     monitors = [
         document

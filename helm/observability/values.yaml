@@ -13,6 +13,14 @@ kube-prometheus-stack:
   alertmanager:
     enabled: false
 
+  # GKE's managed kube-dns exposes Prometheus metrics through its named
+  # `metrics` container port (currently 10054), not the upstream CoreDNS
+  # default of 9153. Keep the Service's stable scrape port while resolving its
+  # backend by name so Prometheus does not retain a permanently down target.
+  coreDns:
+    service:
+      targetPort: metrics
+
   grafana:
     admin:
       existingSecret: grafana-admin-secret
