@@ -626,6 +626,34 @@ def test_sanitizer_redacts_an_entire_kubernetes_secret_document(tmp_path: Path) 
     assert "secret-data" in report.read_text(encoding="utf-8")
 
 
+def test_sanitizer_redacts_evm_address_shaped_wallet_identity(tmp_path: Path) -> None:
+    source = tmp_path / "wallet-identity.txt"
+    output = tmp_path / "sanitized.txt"
+    report = tmp_path / "report.txt"
+    wallet_identity = "0x" + "a" * 40
+    source.write_text(f"assetContract: {wallet_identity}\n", encoding="utf-8")
+
+    result = run(
+        [
+            os.environ.get("PYTHON", "python3"),
+            str(EVIDENCE_UTILITY),
+            "sanitize",
+            "--input",
+            str(source),
+            "--output",
+            str(output),
+            "--report",
+            str(report),
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    sanitized = output.read_text(encoding="utf-8")
+    assert wallet_identity not in sanitized
+    assert "REDACTED wallet address" in sanitized
+    assert report.read_text(encoding="utf-8") == "wallet-keys\n"
+
+
 def test_metadata_validation_rejects_a_namespace_that_does_not_match_the_scenario(tmp_path: Path) -> None:
     output = tmp_path / "metadata.json"
     digest = "sha256:" + "a" * 64

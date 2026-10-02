@@ -49,6 +49,10 @@ SENSITIVE_FIELD = re.compile(
 BEARER_VALUE = re.compile(r"(?i)\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]+")
 URL_CREDENTIALS = re.compile(r"(?i)([a-z][a-z0-9+.-]*://)[^\s/@:]+:[^\s/@]+@")
 PRIVATE_HEX = re.compile(r"(?<![0-9a-fA-F])0x[0-9a-fA-F]{64}(?![0-9a-fA-F])")
+# Evidence is not the place to retain wallet identities.  An EVM address is
+# not a signing key, but it can link testnet activity to an operator wallet;
+# treat the exact address shape with the same conservative category.
+EVM_ADDRESS = re.compile(r"(?<![0-9a-fA-F])0x[0-9a-fA-F]{40}(?![0-9a-fA-F])")
 LONG_BASE64 = re.compile(r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{80,}={0,2}(?![A-Za-z0-9+/=])")
 KUBERNETES_SECRET_KIND = re.compile(r"^\s*kind\s*:\s*['\"]?secret['\"]?\s*(?:#.*)?$", re.IGNORECASE)
 YAML_DOCUMENT_SEPARATOR = re.compile(r"^---\s*(?:#.*)?$")
@@ -135,6 +139,10 @@ def sanitize_document(lines: list[str], categories: set[str]) -> list[str]:
             categories.add("wallet-keys")
             return "0x<REDACTED wallet key>"
 
+        def redact_evm_address(_match: re.Match[str]) -> str:
+            categories.add("wallet-keys")
+            return "0x<REDACTED wallet address>"
+
         def redact_base64(_match: re.Match[str]) -> str:
             categories.add("secret-data")
             return "<REDACTED encoded data>"
@@ -142,6 +150,7 @@ def sanitize_document(lines: list[str], categories: set[str]) -> list[str]:
         line = BEARER_VALUE.sub(redact_bearer, line)
         line = URL_CREDENTIALS.sub(redact_url_credentials, line)
         line = PRIVATE_HEX.sub(redact_private_hex, line)
+        line = EVM_ADDRESS.sub(redact_evm_address, line)
         line = LONG_BASE64.sub(redact_base64, line)
         cleaned.append(line)
 
