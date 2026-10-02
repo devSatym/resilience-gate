@@ -1,8 +1,8 @@
 # Promotion failure model and trade-offs
 
-**Status: design contract.** This is a model for interpreting a future
-Resilience Gate run, not a record that any promotion, fault, payment, or
-recovery has occurred.
+**Status: design contract with scoped supporting evidence.** Named
+staging-testnet records now exercise selected gate paths, but this model is not
+production, mainnet, or release-wide proof.
 
 ## Claim state is narrower than deployment state
 
@@ -31,12 +31,16 @@ workload cannot represent the normal promotion path.
 | `fail` | A scored condition or verified action did not meet its contract. | No. It can be valuable negative evidence. |
 | `blocked` | A safety precondition was not met: for example, no target, active lock, unavailable load, or unresolved configuration. | No. A block is not a healthy result. |
 | `unavailable` | The scenario was not run because the necessary owned lab or dependency was unavailable. | No. It records absence honestly. |
-| not collected | No run metadata or artifacts exist at all. | No. This is the current status for the final evidence scenarios. |
+| not collected | No run metadata or artifacts exist for that scenario. | No. This remains the status for baseline, pipeline regression, and production-like smoke. |
 
 The shared run-metadata schema has a deliberate, limited scenario vocabulary.
 Subcases such as missing telemetry, no target, load failure, and cleanup
 timeout should be described in their run artifacts and scenario status rather
 than fabricated as schema-valid successful runs.
+
+The direct operator boundary records for those subcases are useful negative
+evidence, but they are not Kargo promotion verification, Freight results, or
+release approval.
 
 ## Boundary failures and expected handling
 
@@ -88,6 +92,10 @@ or post-settlement database failure disappear. A future incident record must
 distinguish those conditions rather than misclassifying them as an application
 or chaos success.
 
+One owned-testnet observation produced `402 → signed 201 → replay 409`, but no
+separately versioned payment-evidence bundle is retained. It therefore does not
+establish settlement finality, custody, or a release claim.
+
 ## Chosen trade-offs
 
 | Choice | Benefit | Cost or non-goal |
@@ -102,8 +110,10 @@ or chaos success.
 
 ## Recovery standard
 
-Recovery is a new claim, not an edit to an old result. A valid recovery record
-needs a linked failed or blocked predecessor, an explicit corrective revision,
-new immutable identities, and a separate complete run. Reusing old traffic,
-scorecards, or cleanup output would hide a change in the candidate and is not
-acceptable evidence.
+The recorded recovery pair is a same-identity staging re-verification after
+gate-runner correction: it has a linked predecessor and fresh observations, but
+is not a new workload-candidate or release-wide recovery claim. A future
+release recovery must additionally bind an explicit corrective candidate
+revision, new immutable identities where applicable, and a separate complete
+run. Reusing old traffic, scorecards, or cleanup output would hide a change in
+the candidate and is not acceptable evidence.

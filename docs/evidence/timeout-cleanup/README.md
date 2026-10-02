@@ -1,15 +1,17 @@
-# Timeout-and-cleanup evidence status
+# Short-deadline timeout-and-cleanup evidence
 
-**Status: not collected.** No live workflow timeout or cleanup uncertainty has
-been executed from this workspace.
+**Status: collected as a manual direct staging boundary test.** This was not a
+Kargo verification, Freight promotion, or release approval, and it did not use
+the normal gate timeout.
 
-## Expected safety behavior to verify
+[`20261002-timeout-cleanup`](20261002-timeout-cleanup/) ran the deployed gate
+runner with a deliberately shortened one-second Workflow deadline and an inert
+temporary load source. It created its Workflow and run-scoped load Job, failed
+before the normal 90-second baseline could reach any fault phase, then invoked
+exact-object cleanup. The log records `FAIL` and cleanup; a post-run check
+found no manual Job, temporary CronJob, Workflow, PodChaos, scoped load Job, or
+Lease remaining.
 
-A future bounded run that times out must fail closed. It must also show, after
-the failure, that only its own workflow, fault resources, load job, and lease
-were deleted and then checked absent. A positive score before an unverified
-cleanup is not a passing release result.
-
-Retain the run ID, configured timeout, resource identities, timeout result,
-sanitized cleanup logs, and post-cleanup absence checks. Never infer successful
-cleanup from a delete request alone.
+This proves only the short-deadline cleanup path. It is not evidence of the
+default timeout behavior, a naturally occurring Chaos Mesh timeout, injected
+faults/recovery/scoring, real load/payment traffic, or Kargo verification.

@@ -1,0 +1,3 @@
+[pod/rg-neg-notarget-20261002-ggmcc/chaos-gate] >> acquired gate Lease chaos-gate-runner for neg-notarget-20261002
+[pod/rg-neg-notarget-20261002-ggmcc/chaos-gate] !! target Service rg-negative-no-target has no ready endpoint; refusing to inject a vacuous fault
+[pod/rg-neg-notarget-20261002-ggmcc/chaos-gate] >> verified cleanup deadline: 120s

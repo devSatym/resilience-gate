@@ -1,16 +1,15 @@
-# Load-generation error evidence status
+# Load-source-error boundary evidence
 
-**Status: not collected.** No live load-generator startup or runtime failure
-has been induced or captured for Resilience Gate.
+**Status: collected as a manual direct staging boundary test.** This was not a
+Kargo verification, Freight promotion, or release approval.
 
-## Expected safety behavior to verify
+[`20261002-loadgen-source-error`](20261002-loadgen-source-error/) ran the
+deployed gate runner with deliberately nonexistent source CronJob
+`rg-negative-missing-loadgen`. The runner created a bounded Workflow, then
+failed closed when it could not create the run-scoped load Job and entered
+exact-object cleanup.
 
-Before chaos begins, a future run must show that its bounded load job started
-and produced usable traffic. If the job cannot start, exits unexpectedly, or
-does not yield the required traffic, the gate must block rather than score a
-quiet system as healthy. The evidence should include the job identity, sanitized
-status/log extract, release identity, gate outcome, and verified cleanup.
-
-A local unit test or a rendered CronJob does not establish this behavior in a
-cluster. Until a reviewed lab run is recorded, no load-generation resilience
-claim is supported here.
+This exercises the source-CronJob creation failure only. It did not reach the
+normal load-start, chaos, or scoring phases, so it is not evidence of a
+load-generator startup timeout, runtime traffic failure, actual fault, payment
+flow, or Kargo gate block.

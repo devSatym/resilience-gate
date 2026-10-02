@@ -1,0 +1,11 @@
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] >> acquired gate Lease chaos-gate-runner for b1b6ee6e-e3fd-4523-8345-ef4da6aec609
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] >> created bounded workflow chaos-gate-25xw9
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] >> created loadgen Job loadgen-b1b6ee6e-e3fd-4523-8345-ef4da6aec609
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] !! workflow did not expose a start time for postgres
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] !! workflow did not expose a start time for redis
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] !! workflow did not expose a start time for signer
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] >> annotate: posted (200) — chaos-gate FAIL — failed: postgres,redis,signer (chaos-gate-25xw9)
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] >> GATE VERDICT: FAIL
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] >> verified cleanup deadline: 120s
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] >> cleaning workflow chaos-gate-25xw9
+[pod/7caf8b2e-c494-42a3-bcbc-48833f9573cb.chaos-verdict.1-nzsnd/chaos-gate] >> cleaning loadgen Job loadgen-b1b6ee6e-e3fd-4523-8345-ef4da6aec609

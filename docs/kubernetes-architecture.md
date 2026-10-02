@@ -1,10 +1,11 @@
 # Resilience Gate architecture
 
-**Status: repository design and source map, not live-environment evidence.**
-This document describes the contracts currently represented by the source and
-manifests. No cloud project, Kubernetes cluster, Radius testnet payment, chaos
-experiment, or production-like promotion has been executed to verify this
-architecture from this workspace.
+**Status: repository design and source map with scoped staging-testnet
+evidence.** This document describes the contracts represented by the source and
+manifests. The linked evidence records selected staging reconciliation,
+dependency fault/recovery scoring, and cleanup, but are not complete
+provisioning history, payment settlement proof, or production-like promotion
+evidence.
 
 Resilience Gate is deliberately testnet-only. A directory or namespace called
 `prod` represents a production-like testnet boundary, never a mainnet or
@@ -138,13 +139,13 @@ can be reproduced.
 | Public identifiers are absent, unrendered, or inconsistent. | The renderer and bootstrap preflight are designed to reject unresolved or unsafe input before mutation. | This has not been exercised against an operator account or cluster here. |
 | Current kube context is wrong. | Mutating bootstrap phases require the configured GKE context exactly. | Context checks do not prove that the target itself is safe or funded. |
 | A tag moves after candidate discovery. | The Warehouse discovers constrained tags, but stage templates use `imageFrom(...).Digest` for rendered workload identity. | A digest still needs a real build, signature verification, retention, and live record. |
-| An application process is alive while a dependency is unavailable. | Liveness and readiness are separate; readiness can remove an unready endpoint without asserting the process is dead. | Probe behavior is only source-tested until run in a cluster. |
-| Payment authorization is invalid or the facilitator is unavailable. | The app rejects invalid authorization and treats facilitator transport/response failure as unavailable rather than settled. | No facilitator or chain settlement has been observed for this repository. |
-| Telemetry is missing, stale, malformed, or non-finite. | The scorer fails closed rather than interpreting missing data as zero. | Dashboard/configuration rendering cannot validate actual scrape coverage. |
-| The chaos target is absent, an older run remains, or another run owns the Lease. | The orchestrator is designed to stop before fault injection. | No live target-selection or concurrency result is recorded. |
-| A workflow times out or cleanup cannot be verified. | The final result is forced to fail when run-scoped resources cannot be confirmed absent. | Delete requests and cleanup paths need a real lab exercise. |
+| An application process is alive while a dependency is unavailable. | Liveness and readiness are separate; readiness can remove an unready endpoint without asserting the process is dead. | The recorded gate observed selected PostgreSQL, Redis, and signer faults/recovery only; it does not cover all workload failure modes. |
+| Payment authorization is invalid or the facilitator is unavailable. | The app rejects invalid authorization and treats facilitator transport/response failure as unavailable rather than settled. | A direct `402 → signed 201 → replay 409` testnet observation has no separately versioned evidence bundle; it is not settlement or production assurance. |
+| Telemetry is missing, stale, malformed, or non-finite. | The scorer fails closed rather than interpreting missing data as zero. | A scorer-only unreachable-endpoint test failed closed; it is not a shared-Prometheus outage or full-gate exercise. |
+| The chaos target is absent, an older run remains, or another run owns the Lease. | The orchestrator is designed to stop before fault injection. | The nonexistent-service direct test blocked before fault injection; concurrency behavior remains uncollected. |
+| A workflow times out or cleanup cannot be verified. | The final result is forced to fail when run-scoped resources cannot be confirmed absent. | A one-second direct timeout test invoked cleanup; default-duration timeout behavior remains uncollected. |
 | A candidate is manually patched outside the normal path. | Evidence rules require source, render, image, gate, and runtime identities to agree. | Review discipline still matters; manifests cannot make an undocumented patch auditable. |
-| No owned testnet lab is available. | The correct release state is unavailable/not collected, not pass. | This is the current state of the repository evidence. |
+| A required release scenario has not run. | The correct state is unavailable/not collected, not pass. | Dev baseline, deliberately degraded pipeline regression, and production-like smoke remain uncollected. |
 
 ## Explicit trade-offs
 
@@ -177,4 +178,5 @@ approved owned lab. See [evidence handling](evidence/README.md),
 [artifact identity](design/artifact-identity.md), and
 [the evidence status directories](evidence/).
 
-The current evidence directories record that these live facts are absent.
+The current evidence directories contain narrow, linked staging records while
+the remaining release scenarios are explicitly uncollected.

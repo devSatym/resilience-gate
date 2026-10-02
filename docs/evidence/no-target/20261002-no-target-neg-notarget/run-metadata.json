@@ -1,0 +1,31 @@
+{
+  "chart_revision": "3781f8a5206c660485d0ef2a214663d104eaded5",
+  "cluster_context": "gke_shivam-serverless_us-central1-a_resilience-gate",
+  "collected_at": "2026-10-02T01:24:17Z",
+  "evidence": {
+    "files": [
+      "stage/staging.yaml",
+      "workload/application-deployment.yaml",
+      "analysis/service-health.yaml",
+      "gate/analysis-template.yaml",
+      "workload/signer-deployment.yaml",
+      "workload/loadgen-cronjob.yaml",
+      "gate/job-rg-neg-notarget-20261002.yaml",
+      "gate/pod-rg-neg-notarget-20261002-ggmcc.yaml",
+      "gate/pod-rg-neg-notarget-20261002-ggmcc.log"
+    ],
+    "redactions": [
+      "secret-data"
+    ]
+  },
+  "gate_runner_image_digest": "sha256:129ae3323061fb76c2957662b5849873aebd0322d616795b3f698b2414453d20",
+  "loadgen_image_digest": "sha256:1f40432b1cbe7234e977f96c362c9bc550a2d2b583d014dd8669fe40d3e9e755",
+  "namespace": "url-shortener-staging",
+  "release_image_digest": "sha256:a5beda836336de1677e27c3c2ff09a1ab27d9366040cd985c347d700de6f476b",
+  "repository_revision": "f156b076ce090594529ffe735b9da561e6e9a2f8",
+  "run_id": "20261002-no-target-neg-notarget",
+  "scenario": "chaos-gate",
+  "schema_version": "1.0",
+  "signer_image_digest": "sha256:3e4749d4e9aa7820a7d1b0ab5dfec522f8591552c466ec744038960ea2f077aa",
+  "status": "blocked"
+}

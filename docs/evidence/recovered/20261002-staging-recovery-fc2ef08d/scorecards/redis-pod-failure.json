@@ -1,0 +1,118 @@
+{
+  "checks": [
+    {
+      "evidence_error": null,
+      "expression": "sum(increase(http_requests_total{namespace=\"url-shortener-staging\", handler!~\"/(livez|ready|metrics)\"}[120s]))",
+      "id": "meaningful-traffic",
+      "name": "meaningful non-probe traffic flowed during the Redis fault",
+      "observed": 307.42857142857144,
+      "operator": ">",
+      "query_kind": "instant",
+      "reason": null,
+      "sample_count": 1,
+      "threshold": 50,
+      "unit": "requests",
+      "verdict": "pass"
+    },
+    {
+      "evidence_error": null,
+      "expression": "sum(increase(url_shortener_cache_misses_total{namespace=\"url-shortener-staging\"}[120s]))",
+      "id": "redis-fallback-observed",
+      "name": "the application exercised the Redis-miss fallback path",
+      "observed": 101.71428571428572,
+      "operator": ">",
+      "query_kind": "instant",
+      "reason": null,
+      "sample_count": 1,
+      "threshold": 0,
+      "unit": "fallbacks",
+      "verdict": "pass"
+    },
+    {
+      "evidence_error": null,
+      "expression": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"url-shortener-staging\", handler=\"/{code}\"}[1m])) by (le))",
+      "id": "redirect-latency",
+      "name": "redirect p95 stayed below the degraded-mode latency bound",
+      "observed": 0.3666666666666665,
+      "operator": "<",
+      "query_kind": "range",
+      "reason": null,
+      "sample_count": 10,
+      "threshold": 1.2,
+      "unit": "seconds",
+      "verdict": "pass"
+    },
+    {
+      "evidence_error": null,
+      "expression": "max(increase(kube_pod_container_status_restarts_total{namespace=\"url-shortener-staging\", container=\"url-shortener\"}[120s])) or vector(0)",
+      "id": "app-restarts",
+      "name": "the application did not restart during Redis unavailability",
+      "observed": 0.0,
+      "operator": "<",
+      "query_kind": "instant",
+      "reason": null,
+      "sample_count": 1,
+      "threshold": 0.5,
+      "unit": "restarts",
+      "verdict": "pass"
+    },
+    {
+      "evidence_error": null,
+      "expression": "min(kube_pod_status_ready{namespace=\"url-shortener-staging\", condition=\"true\", pod=\"url-shortener-staging-redis-master-0\"})",
+      "id": "redis-outage-observed",
+      "name": "the Redis target was observed unavailable",
+      "observed": 0.0,
+      "operator": "==",
+      "query_kind": "range",
+      "reason": null,
+      "sample_count": 10,
+      "threshold": 0,
+      "unit": "state",
+      "verdict": "pass"
+    },
+    {
+      "evidence_error": null,
+      "expression": "min(kube_pod_status_ready{namespace=\"url-shortener-staging\", condition=\"true\", pod=\"url-shortener-staging-redis-master-0\"})",
+      "id": "redis-recovered",
+      "name": "the Redis target recovered before the window ended",
+      "observed": 1.0,
+      "operator": "==",
+      "query_kind": "range",
+      "reason": null,
+      "sample_count": 10,
+      "threshold": 1,
+      "unit": "state",
+      "verdict": "pass"
+    },
+    {
+      "evidence_error": null,
+      "expression": "release identity validation",
+      "id": "release-identity",
+      "name": "scorecard is linked to an immutable release and a bounded run id",
+      "observed": null,
+      "operator": "==",
+      "query_kind": "instant",
+      "reason": null,
+      "sample_count": 0,
+      "threshold": 1,
+      "unit": "metadata",
+      "verdict": "pass"
+    }
+  ],
+  "experiment": "redis-pod-failure",
+  "generated_at": "2026-10-02T01:21:02Z",
+  "release": {
+    "image_digest": "sha256:a5beda836336de1677e27c3c2ff09a1ab27d9366040cd985c347d700de6f476b",
+    "revision": "f156b076ce090594529ffe735b9da561e6e9a2f8",
+    "run_id": "chaos-gate-2gfdx"
+  },
+  "schema_version": "resilience-gate.scorecard/v1",
+  "verdict": "pass",
+  "window": {
+    "duration_seconds": 60,
+    "end": "2026-10-02T01:18:56Z",
+    "inject_at": "2026-10-02T01:16:56Z",
+    "settle_seconds": 60,
+    "start": "2026-10-02T01:16:36Z"
+  }
+}

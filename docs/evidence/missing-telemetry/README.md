@@ -1,16 +1,16 @@
-# Missing-telemetry evidence status
+# Telemetry-transport boundary evidence
 
-**Status: not collected.** No live Prometheus outage, empty query result, or
-stale-series condition has been exercised in an owned lab from this workspace.
+**Status: collected as a scorer-only manual direct staging test.** This was not
+a Kargo verification, Freight promotion, full chaos-gate run, or release
+approval.
 
-## Expected safety behavior to verify
+[`20261002-missing-telemetry-scorer`](20261002-missing-telemetry-scorer/) ran
+the PostgreSQL scorer against deliberately unreachable loopback endpoint
+`http://127.0.0.1:1`. Five telemetry-dependent checks emitted
+`query_transport_error` / connection-refused failures; the immutable release
+identity check passed, and the final scorecard verdict was `fail`.
 
-The scorer's contract is fail-closed: an empty series, malformed response,
-non-finite value, insufficient range coverage, or stale sample must prevent a
-passing verdict. A future exercise must retain the sanitized query result or
-error, the query window and expression, the affected release/run identity, and
-the final blocked or failed result.
-
-The absence of telemetry must never be converted to a numeric zero, a quiet
-dashboard, or a success assertion. This page documents the test case; it is
-not evidence that the test case has run.
+It proves that the scorer fails closed for this supplied transport failure. It
+does not simulate an outage of shared Prometheus, establish a real cluster
+telemetry gap, exercise a Workflow/load/fault/cleanup path, or reject a
+promotion.

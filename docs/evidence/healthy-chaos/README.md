@@ -1,34 +1,23 @@
-# Healthy chaos-run evidence status
+# Healthy chaos-run evidence
 
-**Status: not collected.** There is no recorded passing chaos run for
-Resilience Gate. No cloud, Kubernetes, or Radius testnet operation was run to
-create this directory, and no release may cite it as evidence that chaos
-verification passed.
+**Status: collected for one owned staging-testnet run.** This is a narrow
+Kargo-managed staging chaos-gate result, not a production-like or general
+release claim.
 
-## Required record for a future pass
+## Recorded pass
 
-A single bounded chaos-gate run must bind one run ID to the exact source
-revision, chart/configuration revision, workload digest, signer digest, and
-gate-runner digest under test. The submitted evidence must include:
+[`20261001-staging-gate-b8cc5caa`](20261001-staging-gate-b8cc5caa/) records
+the successful staging AnalysisRun
+`staging.01m3w93zc6ddewce35bzy8d2t4.5664b01`. Its gate Job created bounded
+workflow `chaos-gate-fkh9p`, recorded all three dependency-failure scorecards
+as `pass`, and logged cleanup of its workflow and run-scoped load Job.
 
-- sanitized run metadata and target/context identity;
-- a pre-fault readiness and traffic baseline;
-- the bounded workflow result and fault timestamps for every configured
-  experiment;
-- scorecards for the PostgreSQL, Redis, and signer experiments, each carrying
-  the same run ID and immutable workload digest;
-- load and telemetry artifacts sufficient to review every scoring input; and
-- cleanup logs that show the run-scoped workflow, load job, and lease were
-  checked absent after completion.
+The record binds the Kargo-selected source revision, rendered revision, and
+immutable application, gate-runner, signer, and load-generator digests. It
+includes the sanitized gate log and scorecards for PostgreSQL (6 checks), Redis
+(7 checks), and signer (6 checks). Each scorecard records that its target was
+observed unavailable and recovered within its bounded window.
 
-The scorer is deliberately fail-closed: missing, malformed, non-finite,
-insufficient, or stale telemetry is a failed evidence condition, not a zero or
-a pass. A workflow exit alone is therefore not enough to establish a healthy
-chaos result.
-
-## What is absent now
-
-There are currently no run metadata, scorecards, workflow statuses, Prometheus
-responses, load summaries, or cleanup observations in this directory. A later
-approved lab execution must add a new run-specific record rather than replacing
-this status page or backfilling a claimed result.
+This pass supports only that recorded staging identity and scenario. It does
+not replace baseline evidence, a deliberately degraded pipeline regression,
+or a production-like smoke test.

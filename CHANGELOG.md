@@ -20,10 +20,16 @@ created only after the associated evidence checkpoint is actually verified.
 ### Verification status
 
 - No released version is declared by this file.
-- No cloud, Kubernetes, Radius testnet, chaos, recovery, or production-like
-  run is recorded as passing.
+- Sanitized, schema-validated staging-testnet records now capture one
+  Kargo-managed chaos-gate pass, an earlier failed predecessor, and a fresh
+  successful re-verification. See [evidence handling](docs/evidence/README.md).
+- Four manual direct boundary tests also record fail-closed behavior for no
+  target, unavailable load source, telemetry transport error, and a shortened
+  timeout/cleanup path. They are not Kargo promotions or release approvals.
+- Baseline, deliberately degraded pipeline regression, and production-like
+  smoke evidence remain not collected.
 - No v1.0 tag or evidence-backed release claim should be inferred from the
-  source changes above.
+  source changes or scoped staging records above.
 
 When an approved lab run exists, its sanitized evidence must be reviewed and
 linked here with the tested revisions and digest-qualified artifacts before a

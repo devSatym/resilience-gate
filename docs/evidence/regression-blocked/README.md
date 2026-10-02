@@ -16,3 +16,6 @@ negative evidence only when the blocking reason is explicit and reviewable.
 Do not label a manually patched workload, a mutable tag, or a locally rendered
 overlay as a verified pipeline regression. It must travel through the intended
 testnet verification path before it can support that claim.
+
+The direct boundary tests in sibling directories are not deliberately degraded,
+pipeline-produced Freight and do not change this status.

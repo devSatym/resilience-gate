@@ -1,9 +1,10 @@
 # Owned testnet lab lifecycle
 
-**Status: operational contract, not provisioning history.** The commands in
-this runbook are designed for the owned Resilience Gate testnet lab. The
-repository contains no record that a project, cluster, controller, or release
-has been created or successfully destroyed.
+**Status: operational contract, not complete provisioning history.** The
+commands in this runbook are designed for the owned Resilience Gate testnet
+lab. The repository has narrow evidence that a staging lab and selected
+workloads/controllers ran, but it does not claim complete project/cluster
+provisioning history or a successful teardown.
 
 `platform_setup_scripts/config.env` is ignored local operator input. It may
 contain public project, registry, and cluster identifiers, but never Secret

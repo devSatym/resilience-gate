@@ -1,16 +1,18 @@
 # Known limitations and non-claims
 
 Resilience Gate is intentionally a small, testnet-only reference platform.
-The source is useful for studying delivery and verification boundaries, but it
-does not yet establish a live release system.
+It now has narrow, named staging-testnet records, but those records do not
+establish a complete live release system or a production-like release.
 
 ## Current verification gap
 
-There is no recorded owned-lab execution for cloud provisioning, cluster
-bootstrap, GitOps reconciliation, artifact publication, signer startup,
-facilitator settlement, load generation, fault injection, telemetry scoring,
-cleanup, recovery, or production-like smoke. Offline tests, static rendering,
-and local Compose checks do not close this gap.
+The repository records selected staging reconciliation, bounded dependency
+fault/recovery scoring, cleanup, and direct fail-closed boundary behavior under
+[`docs/evidence/`](evidence/README.md). It still lacks an owned dev baseline,
+an intentionally degraded **pipeline-produced** candidate, and a
+production-like smoke. There is also no release-wide assurance, provisioning
+history, or teardown history. Offline tests, static rendering, and local
+Compose checks do not close those remaining gaps.
 
 ## Deliberate scope limits
 
@@ -28,21 +30,23 @@ and local Compose checks do not close this gap.
   scenarios with a fixed time budget. It does not prove resilience to every
   network partition, node failure, data-corruption event, concurrent fault, or
   long-duration degradation.
-- **Promotion contracts are not controller state.** Kargo and Argo CD manifests
-  describe desired behavior. They do not prove controller installation,
-  permissions, branch access, repository credentials, or reconciliation.
+- **Controller evidence is scoped.** The named staging records show that the
+  selected controllers and runner path operated for those exact executions.
+  They do not prove controller installation history, permissions, branch
+  access, repository credentials, or reconciliation for every environment.
 - **Digest policy still needs supply-chain operation.** A digest-qualified
   manifest does not prove that CI built, signed, retained, or deployed that
   artifact. Those facts need an identity record and live evidence.
 - **Payment consistency remains distributed.** Settlement and database
   persistence are not one transaction. A failure after settlement may require
-  deliberate reconciliation, and no live payment behavior is recorded here.
+  deliberate reconciliation. One owned-testnet sequence observed
+  `402 → signed 201 → replay 409`, but no separately versioned payment-evidence
+  bundle is retained, so it is not a settlement, custody, or release claim.
 
 ## What would reduce these limits
 
-An approved owned testnet lab should first run the documented preflight and
-bootstrap checks, then collect a new sanitized record for each required
-baseline, negative scenario, recovery, and production-like smoke. Each record
-must bind the same source/render/image identities seen by the gate and verify
-that run-scoped resources were cleaned up. Only then can a release document
-make a scoped verified claim.
+An approved owned testnet lab should next collect new sanitized records for the
+dev baseline, a deliberately degraded pipeline-produced candidate, and the
+production-like smoke. Each must bind the same source/render/image identities
+seen by the gate and verify that run-scoped resources were cleaned up. Only
+then can a release document make a scoped verified claim.

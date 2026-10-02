@@ -1,15 +1,14 @@
-# No-target evidence status
+# No-target boundary evidence
 
-**Status: not collected.** No approved lab run has tested the case where the
-target Service has no ready EndpointSlice endpoint.
+**Status: collected as a manual direct staging boundary test.** This was not a
+Kargo verification, Freight promotion, or release approval.
 
-## Expected safety behavior to verify
+[`20261002-no-target-neg-notarget`](20261002-no-target-neg-notarget/) ran the
+deployed gate runner against intentionally nonexistent Service
+`rg-negative-no-target`. The runner acquired its Lease, found no ready
+EndpointSlice address, and blocked with a refusal to inject a vacuous fault;
+the log then records Lease cleanup.
 
-The gate should inspect the selected target before it creates a fault workflow.
-If it cannot find a ready endpoint, it must stop with a clear blocked or failed
-outcome and must not inject a fault into an ambiguous target. A future record
-needs the sanitized EndpointSlice observation, selected namespace/service,
-release identity, gate output, and cleanup verification.
-
-This directory contains no such observation today. It is a collection contract,
-not proof that target selection has been exercised live.
+This demonstrates the direct runner's target preflight for the supplied
+service. It does not claim a pipeline block, fault injection, traffic,
+telemetry scoring, payment behavior, or production behavior.

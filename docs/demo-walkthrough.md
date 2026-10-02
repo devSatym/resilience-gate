@@ -69,12 +69,14 @@ rendered diff through the normal project workflow before continuing elsewhere.
 
 ## 5. Understand the live-evidence boundary
 
-The directories under [evidence](evidence/) are intentionally status pages,
-not run results. A future approved lab exercise needs fresh sanitized metadata
-and artifacts for its exact source revision, rendered revision, workload and
-runtime digests, target scope, traffic window, scorecards, and cleanup checks.
+This walkthrough produces no live evidence. Separately collected, scoped
+staging-testnet records are available under [evidence](evidence/), but they do
+not make this offline walkthrough a release verification. A future approved
+lab exercise still needs fresh sanitized metadata and artifacts for its exact
+source revision, rendered revision, workload and runtime digests, target scope,
+traffic window, scorecards, and cleanup checks.
 
 Until that happens, the truthful demo conclusion is:
 
-> The local source and offline checks can be reproduced; no live Resilience
-> Gate release behavior has been verified.
+> The local source and offline checks can be reproduced; this walkthrough does
+> not itself verify live Resilience Gate release behavior.

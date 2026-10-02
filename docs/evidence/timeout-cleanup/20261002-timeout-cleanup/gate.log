@@ -1,0 +1,12 @@
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] >> acquired gate Lease chaos-gate-runner for neg-timeout-20261002
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] >> created bounded workflow chaos-gate-g57b2
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] >> created loadgen Job loadgen-neg-timeout-20261002
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] !! workflow did not complete within 1s
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] !! workflow did not expose a successful Apply timestamp for postgres
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] !! workflow did not expose a successful Apply timestamp for redis
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] !! workflow did not expose a successful Apply timestamp for signer
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] >> annotate: posted (200) — chaos-gate FAIL — failed: workflow,postgres,redis,signer (chaos-gate-g57b2)
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] >> GATE VERDICT: FAIL
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] >> verified cleanup deadline: 120s
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] >> cleaning workflow chaos-gate-g57b2
+[pod/rg-neg-timeout-20261002-98zdt/chaos-gate] >> cleaning loadgen Job loadgen-neg-timeout-20261002

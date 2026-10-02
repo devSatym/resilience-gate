@@ -1,10 +1,10 @@
 # x402 and Permit2 design status
 
-**Status: implemented source contract; no live migration or testnet settlement
-has been verified.** This note replaces inherited historical migration claims
-with the behavior represented by the current application and signer source.
-It must not be read as proof that a facilitator was reached, a wallet was
-funded, or an on-chain transaction settled.
+**Status: implemented source contract with one bounded owned-testnet
+observation.** A direct interaction observed `402 → signed 201 → replay 409`.
+No separately versioned payment-evidence bundle is retained, so this note must
+not be read as proof of audited settlement, wallet funding, custody, or an
+on-chain transaction finality claim.
 
 ## Intended request path
 
@@ -51,8 +51,9 @@ funding, and facilitator/network compatibility in a real lab.
 | Signer not bootstrapped or requested wallet unavailable | Signer returns a non-ready/error response; callers must not treat it as a valid authorization. |
 
 The last two rows are important operational limits. They are deliberately not
-hidden behind a generic success response, but they have not been exercised
-against a live facilitator or testnet chain for this project.
+hidden behind a generic success response. The bounded testnet observation above
+does not exercise every facilitator or chain failure mode and is not a durable
+settlement-evidence record.
 
 ## Scope and verification boundary
 
@@ -62,7 +63,7 @@ integration, wallet custody controls beyond the described process boundary, or
 production payment availability.
 
 Offline tests can validate codecs, requirements comparison, response handling,
-and signing behavior with fixtures. A verified payment claim requires separate
-sanitized evidence that identifies the source revision, immutable workload and
-signer identities, configuration scope, and the actual result. No such live
-evidence is present in this repository.
+and signing behavior with fixtures. A verified payment claim still requires a
+separately sanitized, retained record that identifies the source revision,
+immutable workload and signer identities, configuration scope, and actual
+settlement result. The recorded interaction does not satisfy that higher bar.

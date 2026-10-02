@@ -1,8 +1,9 @@
 # Chaos-gate verification runbook
 
-**Status: implementation guide, not a live-run record.** This repository has
-not recorded a cloud, Kubernetes, Radius testnet, or production-like chaos-gate
-execution. A successful local test, rendered manifest, or read-only verifier
+**Status: implementation guide, not an exhaustive live-run history.** Scoped
+staging-testnet records are available under [evidence](../evidence/README.md),
+including a Kargo-managed pass, linked re-verification, and manual boundary
+tests. A successful local test, rendered manifest, or read-only verifier still
 does not establish that a release passed.
 
 Use this runbook only for the explicitly owned Resilience Gate testnet lab. A
@@ -95,8 +96,8 @@ run-scoped cleanup for that particular run ID.
 ## Failure handling
 
 Stop when the verifier reports a failed prerequisite, Kargo rejects a request,
-the gate blocks, telemetry is absent or stale, or cleanup cannot be verified.
-Preserve sanitized observations, record the result as blocked or unavailable
-when appropriate, and investigate the failed layer before retrying. Do not
-broaden the fault scope, load budget, wallet funding, or target environment to
-turn a failed result into a pass.
+the gate blocks or fails, telemetry is absent or stale, or cleanup cannot be
+verified. Preserve sanitized observations, record `fail`, `blocked`, or
+`unavailable` as appropriate, and investigate the failed layer before retrying.
+Do not broaden the fault scope, load budget, wallet funding, or target
+environment to turn a failed result into a pass.
