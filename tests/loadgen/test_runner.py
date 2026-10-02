@@ -107,7 +107,7 @@ def test_baseline_bounds_fail_before_cluster_access(tmp_path: Path) -> None:
     assert "kubectl-was-called" not in vus.stderr
 
 
-def test_baseline_execution_copies_safe_artifacts_and_exactly_cleans_its_job(tmp_path: Path) -> None:
+def test_baseline_execution_recovers_safe_artifacts_and_exactly_cleans_its_job(tmp_path: Path) -> None:
     fake_kubectl = tmp_path / "kubectl"
     calls = tmp_path / "kubectl-calls.log"
     fake_kubectl.write_text(
@@ -152,9 +152,8 @@ if [[ "$args" == *"get pod baseline-pod -o json"* ]]; then
   printf '%s\n' '{"status":{"startTime":"2026-10-02T00:00:00Z","containerStatuses":[{"name":"k6","state":{"terminated":{"finishedAt":"2026-10-02T00:01:30Z"}}}]}}'
   exit 0
 fi
-if [[ "$args" == *"cp -c k6 "* ]]; then
-  for destination; do :; done
-  printf '{"metrics": {}}\\n' > "$destination"
+if [[ "$args" == *"logs pod/baseline-pod -c k6 --tail=200"* ]]; then
+  printf '%s\\n' 'RESILIENCE_GATE_K6_SUMMARY {"schema_version":"resilience-gate.loadgen-summary/v1","traffic_mode":"unpaid-baseline","metrics":{"http_reqs":{"type":"counter","values":{"count":45},"thresholds":{}}}}'
   exit 0
 fi
 if [[ "$args" == *"delete job baseline-manual-"* ]]; then
@@ -189,11 +188,24 @@ exit 99
     records = list(artifact_dir.glob("baseline-manual-*-run.json"))
     assert len(summaries) == 1
     assert len(records) == 1
+    summary = json.loads(summaries[0].read_text(encoding="utf-8"))
+    assert summary == {
+        "schema_version": "resilience-gate.loadgen-summary/v1",
+        "traffic_mode": "unpaid-baseline",
+        "metrics": {
+            "http_reqs": {
+                "type": "counter",
+                "values": {"count": 45},
+                "thresholds": {},
+            }
+        },
+    }
     record = json.loads(records[0].read_text(encoding="utf-8"))
     assert record["scenario"] == "baseline"
     assert record["source"]["namespace"] == "url-shortener-staging"
     assert record["target"]["namespace"] == "url-shortener-dev"
     assert record["target"]["traffic"] == "unpaid GET / only"
+    assert record["summary_capture"] == "pod-log-sentinel"
     assert record["observation"] == {
         "started_at": "2026-10-02T00:00:00Z",
         "ended_at": "2026-10-02T00:01:30Z",
@@ -209,6 +221,8 @@ exit 99
     assert "PAYMENT_ENABLED=false" in recorded
     assert "TRAFFIC_MODE=unpaid-baseline" in recorded
     assert '\"activeDeadlineSeconds\":150' in recorded
+    assert "logs pod/baseline-pod -c k6 --tail=200" in recorded
+    assert " cp -c k6 " not in recorded
     assert "radius-signer" not in recorded
     assert "externalsecret" not in recorded
     assert "delete job baseline-manual-" in recorded

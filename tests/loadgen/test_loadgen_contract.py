@@ -78,3 +78,17 @@ def test_loadgen_records_separate_redirect_and_end_to_end_outcomes() -> None:
     assert "redirects: 0" in source
     assert "example.invalid" in source
     assert "export function independentRedirectProbe()" in source
+
+
+def test_loadgen_emits_a_sanitized_machine_readable_summary_marker() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    summary = source.split("export function handleSummary(data)", 1)[1]
+
+    assert "RESILIENCE_GATE_K6_SUMMARY " in source
+    assert "schema_version: 'resilience-gate.loadgen-summary/v1'" in summary
+    assert "'/results/summary.json': serialized" in summary
+    assert "stdout: `${SUMMARY_MARKER}${serialized}\\n`" in summary
+    assert "data.options" not in summary
+    assert "BASE_URL" not in summary
+    assert "SIGNER_URL" not in summary
+    assert "PAYMENT-SIGNATURE" not in summary

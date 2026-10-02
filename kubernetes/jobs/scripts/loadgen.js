@@ -99,6 +99,7 @@ const PAYMENT_BUFFER = positiveInteger(
 const REDIRECT_PROBE_URL = environment('REDIRECT_PROBE_URL');
 const DEV_BASELINE_URL = 'http://url-shortener-dev.url-shortener-dev.svc.cluster.local';
 const MAX_BASELINE_DURATION_MS = 90 * 1000;
+const SUMMARY_MARKER = 'RESILIENCE_GATE_K6_SUMMARY ';
 
 let scenarios;
 let thresholds;
@@ -476,6 +477,49 @@ export function independentRedirectProbe() {
   check(response, { 'independent redirect 302': (result) => result.status === 302 });
   independentRedirectOkRate.add(succeeded);
   sleep(SLEEP_SECONDS);
+}
+
+function safeMetricSummary(metric) {
+  const values = {};
+  const rawValues = metric && metric.values && typeof metric.values === 'object' ? metric.values : {};
+  for (const [name, value] of Object.entries(rawValues)) {
+    if (typeof value === 'number' && Number.isFinite(value)) values[name] = value;
+  }
+  const thresholds = {};
+  const rawThresholds = metric && metric.thresholds && typeof metric.thresholds === 'object'
+    ? metric.thresholds
+    : {};
+  for (const [name, result] of Object.entries(rawThresholds)) {
+    if (result && typeof result.ok === 'boolean') thresholds[name] = { ok: result.ok };
+  }
+  return {
+    type: metric && typeof metric.type === 'string' ? metric.type : 'unknown',
+    values,
+    thresholds,
+  };
+}
+
+// Completed Kubernetes containers cannot be used as a kubectl cp source.
+// k6 calls handleSummary at the end of each test, so emit one deliberately
+// sanitized, machine-readable marker that the runner can recover from logs.
+// Do not serialize options, environment, request bodies, headers, or tags:
+// they can carry endpoint or payment context that does not belong in evidence.
+export function handleSummary(data) {
+  const metrics = {};
+  const rawMetrics = data && typeof data.metrics === 'object' ? data.metrics : {};
+  for (const name of Object.keys(rawMetrics).sort()) {
+    metrics[name] = safeMetricSummary(rawMetrics[name]);
+  }
+  const summary = {
+    schema_version: 'resilience-gate.loadgen-summary/v1',
+    traffic_mode: TRAFFIC_MODE,
+    metrics,
+  };
+  const serialized = JSON.stringify(summary);
+  return {
+    '/results/summary.json': serialized,
+    stdout: `${SUMMARY_MARKER}${serialized}\n`,
+  };
 }
 
 // Preserve the ordinary k6 entrypoint for local reviewers while the CronJob

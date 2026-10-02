@@ -56,7 +56,6 @@ spec:
               imagePullPolicy: IfNotPresent
               args:
                 - run
-                - --summary-export=/results/summary.json
                 - /scripts/loadgen.js
               envFrom:
                 - secretRef:

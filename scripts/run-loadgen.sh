@@ -360,6 +360,7 @@ record = {
         "job_active_deadline_seconds": int(active_deadline_seconds),
     },
     "summary_file": summary_file,
+    "summary_capture": "pod-log-sentinel",
     "cleanup": {
         "strategy": "exact-job-delete",
         "completed_at": cleanup_at,
@@ -371,13 +372,73 @@ PY
   printf 'Baseline run and cleanup record copied to %s\n' "$record_path"
 }
 
+extract_summary_from_logs() {
+  local output_path="$1"
+  local expected_traffic_mode="$2"
+
+  kubectl -n "$NAMESPACE" logs "pod/$pod_name" -c k6 --tail=200 | python3 -c '
+import json
+import math
+import sys
+from pathlib import Path
+
+output_path = Path(sys.argv[1])
+expected_traffic_mode = sys.argv[2]
+marker = "RESILIENCE_GATE_K6_SUMMARY "
+max_marker_bytes = 256 * 1024
+summaries = []
+
+for line in sys.stdin:
+    index = line.find(marker)
+    if index == -1:
+        continue
+    encoded = line[index + len(marker):].strip().encode("utf-8")
+    if len(encoded) > max_marker_bytes:
+        raise SystemExit("loadgen summary marker exceeds the size limit")
+    try:
+        payload = json.loads(encoded)
+    except json.JSONDecodeError:
+        raise SystemExit("loadgen log contained an invalid summary marker")
+    summaries.append(payload)
+
+if len(summaries) != 1:
+    raise SystemExit("loadgen log must contain exactly one summary marker")
+payload = summaries[0]
+if not isinstance(payload, dict):
+    raise SystemExit("loadgen summary must be an object")
+if payload.get("schema_version") != "resilience-gate.loadgen-summary/v1":
+    raise SystemExit("loadgen summary schema is unsupported")
+if payload.get("traffic_mode") != expected_traffic_mode:
+    raise SystemExit("loadgen summary traffic mode does not match the requested run")
+metrics = payload.get("metrics")
+if not isinstance(metrics, dict) or not metrics:
+    raise SystemExit("loadgen summary must contain metrics")
+for name, metric in metrics.items():
+    if not isinstance(name, str) or not isinstance(metric, dict):
+        raise SystemExit("loadgen summary has an invalid metric")
+    if (
+        not isinstance(metric.get("type"), str)
+        or not isinstance(metric.get("values"), dict)
+        or not isinstance(metric.get("thresholds"), dict)
+    ):
+        raise SystemExit("loadgen summary has an invalid metric shape")
+    for value in metric["values"].values():
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise SystemExit("loadgen summary contains a non-finite metric value")
+    for threshold, result in metric["thresholds"].items():
+        if not isinstance(threshold, str) or not isinstance(result, dict) or not isinstance(result.get("ok"), bool):
+            raise SystemExit("loadgen summary has an invalid threshold")
+if output_path.exists() or output_path.is_symlink():
+    raise SystemExit("refusing to overwrite an existing loadgen summary")
+output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+' "$output_path" "$expected_traffic_mode"
+}
+
 print_plan
 [[ "$mode" == "execute" ]] || exit 0
 
 command -v kubectl >/dev/null 2>&1 || die "kubectl is required for --execute"
-if [[ "$scenario" == "baseline" ]]; then
-  command -v python3 >/dev/null 2>&1 || die "python3 is required to write the baseline run record"
-fi
+command -v python3 >/dev/null 2>&1 || die "python3 is required to recover the loadgen summary"
 context="$(kubectl config current-context 2>/dev/null || true)"
 [[ -n "$context" ]] || die "kubectl has no current context"
 
@@ -477,9 +538,9 @@ print(f"{started_at}\t{finished_at}")
 fi
 mkdir -p "$artifact_dir"
 summary_path="$artifact_dir/$job_name-summary.json"
-kubectl -n "$NAMESPACE" cp -c k6 "$pod_name:/results/summary.json" "$summary_path"
+extract_summary_from_logs "$summary_path" "$traffic_mode"
 if [[ "$scenario" == "baseline" ]]; then
   cleanup_baseline_job || die "could not verify exact cleanup for Job/$job_name"
   write_baseline_record
 fi
-printf 'Load-generation summary copied to %s\n' "$summary_path"
+printf 'Sanitized load-generation summary recovered from Pod logs to %s\n' "$summary_path"

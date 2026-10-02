@@ -115,7 +115,8 @@ def test_suspended_loadgen_is_digest_pinned_and_exports_a_summary() -> None:
     assert container["image"].startswith("grafana/k6@sha256:")
     assert DIGEST.search(container["image"])
     assert ":latest" not in container["image"]
-    assert "--summary-export=/results/summary.json" in container["args"]
+    assert "--summary-export=/results/summary.json" not in container["args"]
+    assert container["args"] == ["run", "/scripts/loadgen.js"]
     assert container["envFrom"] == [{"secretRef": {"name": "resilience-gate-loadgen-credentials"}}]
     assert "K6_NO_USAGE_REPORT" in {item["name"] for item in container["env"]}
     assert pod["automountServiceAccountToken"] is False
