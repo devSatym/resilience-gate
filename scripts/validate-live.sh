@@ -166,6 +166,9 @@ print_command() {
 if [[ -n "$promotion_freight" ]]; then
   action=(kargo promote --project "$KARGO_PROJECT" --freight "$promotion_freight" --stage "$stage")
 else
+  # Keep the dry-run contract stable regardless of which local tools happen to
+  # be installed. The annotation fallback below expresses this same reviewed
+  # Kargo reverify request when a compatible CLI is unavailable.
   action=(kargo verify stage "$stage" --project "$KARGO_PROJECT")
 fi
 
@@ -181,6 +184,9 @@ if [[ "$mode" == "plan" ]]; then
     printf "%s\n" "  Action: reverify the Stage's current Freight"
   fi
   print_command "${action[@]}"
+  if [[ -z "$promotion_freight" ]] && ! command -v kargo >/dev/null 2>&1; then
+    printf '%s\n' "  Execute fallback without a compatible Kargo CLI: annotate the Stage with its latest verification ID"
+  fi
   cat <<'NOTICE'
 
 Review the actual Freight identities and the rendered application before using
@@ -202,7 +208,10 @@ fi
 source "$PLATFORM_DIR/lib.sh"
 load_config "$config_file"
 require_env PROJECT_ID ZONE CLUSTER_NAME
-require_command kubectl kargo
+require_command kubectl
+if [[ -n "$promotion_freight" ]]; then
+  require_command kargo || die "a named promotion requires a compatible Kargo CLI"
+fi
 require_target_context
 
 # Establish that both the target namespace and the reviewed Kargo contract are
@@ -219,6 +228,19 @@ done < <(analysis_templates_for_scenario "$scenario")
 if [[ -n "$promotion_freight" ]]; then
   kubectl -n "$KARGO_PROJECT" get freight "$promotion_freight" >/dev/null \
     || die "Freight/$promotion_freight is not present in project $KARGO_PROJECT"
+fi
+
+if [[ -z "$promotion_freight" ]] && ! command -v kargo >/dev/null 2>&1; then
+  # Resolve the exact previous verification only after every read-only safety
+  # check. Plan mode never queries a cluster merely to produce its preview.
+  prior_verification_id="$(kubectl -n "$KARGO_PROJECT" get stage "$stage" \
+    -o jsonpath='{.status.freightHistory[0].verificationHistory[0].id}')"
+  [[ -n "$prior_verification_id" ]] \
+    || die "Stage/$stage has no prior verification ID for a reverify request"
+  action=(
+    kubectl -n "$KARGO_PROJECT" annotate "stage.kargo.akuity.io/$stage"
+    "kargo.akuity.io/reverify=$prior_verification_id" --overwrite
+  )
 fi
 
 printf 'Requesting the reviewed Kargo verification path:\n'

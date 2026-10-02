@@ -81,6 +81,7 @@ def fake_environment(
     *,
     fail_gate_exec: bool = False,
     log_scorecards: tuple[str, ...] | None = None,
+    include_kargo: bool = True,
 ) -> tuple[dict[str, str], Path, Path]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -125,6 +126,10 @@ if [[ "$args" == *"get stage dev -o yaml"* ]]; then
 fi
 if [[ "$args" == *"get stage prod -o yaml"* ]]; then
   printf 'apiVersion: kargo.akuity.io/v1alpha1\\nkind: Stage\\nmetadata:\\n  name: prod\\n'
+  exit 0
+fi
+if [[ "$args" == *"get stage dev -o jsonpath="* || "$args" == *"get stage staging -o jsonpath="* || "$args" == *"get stage prod -o jsonpath="* ]]; then
+  printf 'verification-1'
   exit 0
 fi
 if [[ "$args" == *"get analysistemplate chaos-gate -o yaml"* ]]; then
@@ -178,19 +183,23 @@ if [[ "$args" == *"exec gate-pod-1"* ]]; then
   exit 1
 fi
 if [[ "$args" == *"get stage staging"* ]]; then exit 0; fi
+if [[ "$args" == *"get stage dev"* ]]; then exit 0; fi
+if [[ "$args" == *"get stage prod"* ]]; then exit 0; fi
+if [[ "$args" == *"annotate stage.kargo.akuity.io/"* ]]; then exit 0; fi
 if [[ "$args" == *"get analysistemplate chaos-gate"* ]]; then exit 0; fi
 if [[ "$args" == *"get analysistemplate service-health"* ]]; then exit 0; fi
 if [[ "$args" == *"get freight candidate-1"* ]]; then exit 0; fi
 exit 1
 """,
     )
-    write_executable(
-        bin_dir / "kargo",
-        f"""
+    if include_kargo:
+        write_executable(
+            bin_dir / "kargo",
+            f"""
 printf 'kargo %s\\n' "$*" >> {calls}
 exit 0
 """,
-    )
+        )
     env = os.environ | {
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "FAIL_GATE_EXEC": "1" if fail_gate_exec else "0",
@@ -252,6 +261,32 @@ def test_live_execution_uses_kargo_stage_verification_not_a_direct_chaos_run(tmp
     assert "not a passing verification verdict" in result.stdout
     recorded = calls.read_text(encoding="utf-8")
     assert "kargo verify stage staging --project resilience-gate" in recorded
+    assert "kubectl create" not in recorded
+    assert "kubectl apply" not in recorded
+    assert "kubectl delete" not in recorded
+
+
+def test_live_reverify_falls_back_to_the_stage_annotation_without_a_kargo_cli(tmp_path: Path) -> None:
+    env, calls, config = fake_environment(tmp_path, include_kargo=False)
+
+    result = run(
+        [
+            "bash",
+            str(LIVE_RUNNER),
+            "--execute",
+            "--acknowledge-owned-testnet-lab",
+            "--scenario",
+            "baseline",
+            "--config",
+            str(config),
+        ],
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    recorded = calls.read_text(encoding="utf-8")
+    assert "kargo " not in recorded
+    assert "kubectl -n resilience-gate annotate stage.kargo.akuity.io/dev kargo.akuity.io/reverify=verification-1 --overwrite" in recorded
     assert "kubectl create" not in recorded
     assert "kubectl apply" not in recorded
     assert "kubectl delete" not in recorded
