@@ -148,12 +148,8 @@ if [[ "$args" == *"get pod -l job-name=baseline-manual-"* ]]; then
   printf 'baseline-pod\\n'
   exit 0
 fi
-if [[ "$args" == *"get pod baseline-pod -o jsonpath={.status.startTime}"* ]]; then
-  printf '2026-10-02T00:00:00Z'
-  exit 0
-fi
-if [[ "$args" == *"get pod baseline-pod -o jsonpath={.status.containerStatuses"* ]]; then
-  printf '2026-10-02T00:01:30Z'
+if [[ "$args" == *"get pod baseline-pod -o json"* ]]; then
+  printf '%s\n' '{"status":{"startTime":"2026-10-02T00:00:00Z","containerStatuses":[{"name":"k6","state":{"terminated":{"finishedAt":"2026-10-02T00:01:30Z"}}}]}}'
   exit 0
 fi
 if [[ "$args" == *"cp -c k6 "* ]]; then

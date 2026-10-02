@@ -452,8 +452,26 @@ fi
 pod_name="$(kubectl -n "$NAMESPACE" get pod -l "job-name=$job_name" -o jsonpath='{.items[0].metadata.name}')"
 [[ -n "$pod_name" ]] || die "could not locate the completed pod for Job/$job_name"
 if [[ "$scenario" == "baseline" ]]; then
-  baseline_observation_started_at="$(kubectl -n "$NAMESPACE" get pod "$pod_name" -o jsonpath='{.status.startTime}')"
-  baseline_observation_ended_at="$(kubectl -n "$NAMESPACE" get pod "$pod_name" -o jsonpath='{.status.containerStatuses[?(@.name==\"k6\")].state.terminated.finishedAt}')"
+  pod_timestamps="$(kubectl -n "$NAMESPACE" get pod "$pod_name" -o json | python3 -c '
+import json
+import sys
+
+pod = json.load(sys.stdin)
+status = pod.get("status", {})
+started_at = status.get("startTime")
+finished_at = next(
+    (
+        item.get("state", {}).get("terminated", {}).get("finishedAt")
+        for item in status.get("containerStatuses", [])
+        if item.get("name") == "k6"
+    ),
+    None,
+)
+if not isinstance(started_at, str) or not isinstance(finished_at, str):
+    raise SystemExit("completed baseline Pod is missing start or k6 finish time")
+print(f"{started_at}\t{finished_at}")
+')"
+  IFS=$'\t' read -r baseline_observation_started_at baseline_observation_ended_at <<< "$pod_timestamps"
   [[ -n "$baseline_observation_started_at" && -n "$baseline_observation_ended_at" ]] \
     || die "could not bind the baseline observation window to completed Pod/$pod_name"
 fi
