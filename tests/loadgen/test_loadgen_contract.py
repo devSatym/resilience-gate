@@ -80,6 +80,21 @@ def test_loadgen_records_separate_redirect_and_end_to_end_outcomes() -> None:
     assert "export function independentRedirectProbe()" in source
 
 
+def test_paid_traffic_marker_is_fixed_and_requires_a_successful_end_to_end_flow() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    payment_flow = source.split("export function paymentFlow()", 1)[1].split(
+        "export function independentRedirectProbe()", 1
+    )[0]
+
+    assert "PAID_TRAFFIC_READY_MARKER = 'RESILIENCE_GATE_PAID_TRAFFIC_READY v1'" in source
+    assert "TRAFFIC_MODE === 'paid' && PAYMENT_ENABLED && created && redirected" in payment_flow
+    assert "console.log(PAID_TRAFFIC_READY_MARKER);" in payment_flow
+    assert "paidTrafficReadyReported = true;" in payment_flow
+    marker_section = payment_flow.split("PAID_TRAFFIC_READY_MARKER", 1)[1]
+    assert "paymentSignature" not in marker_section
+    assert "signerBody" not in marker_section
+
+
 def test_loadgen_emits_a_sanitized_machine_readable_summary_marker() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     summary = source.split("export function handleSummary(data)", 1)[1]

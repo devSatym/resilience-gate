@@ -68,6 +68,14 @@ rules:
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["get", "create", "patch", "delete"]
+  # The runner reads one fixed readiness marker from only its exact
+  # run-scoped loadgen Job before it creates a Chaos Mesh Workflow.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
   - apiGroups: ["discovery.k8s.io"]
     resources: ["endpointslices"]
     verbs: ["get", "list"]

@@ -35,8 +35,10 @@ readonly GATE_JOB_DEADLINE_SECONDS="${GATE_JOB_DEADLINE_SECONDS:-1320}"
 readonly LOCK_DURATION_SECONDS="${LOCK_DURATION_SECONDS:-1470}"
 readonly LOCK_NAME="${LOCK_NAME:-chaos-gate-runner}"
 readonly GATE_SELECTOR="resilience-gate.io/gate=chaos"
+readonly LOADGEN_TRAFFIC_MARKER="RESILIENCE_GATE_PAID_TRAFFIC_READY v1"
 
 readonly MAX_LOADGEN_STARTUP_SECONDS=90
+readonly LOADGEN_PROBE_TIMEOUT_SECONDS=5
 readonly MAX_WORKFLOW_SECONDS=660
 readonly PROMETHEUS_REQUEST_TIMEOUT_SECONDS=15
 readonly MAX_PROMETHEUS_QUERIES_PER_EXPERIMENT=6
@@ -353,24 +355,126 @@ create_loadgen() {
   log ">> created loadgen Job $LOADGEN_JOB"
 }
 
-wait_for_loadgen_start() {
-  local deadline status active failed
+loadgen_status() {
+  local timeout_seconds="$1"
+  "$TIMEOUT_BIN" --foreground "${timeout_seconds}s" \
+    "$KUBECTL" -n "$TARGET_NAMESPACE" get job "$LOADGEN_JOB" \
+    -o jsonpath='{.status.active}{" "}{.status.succeeded}{" "}{.status.failed}'
+}
+
+loadgen_has_paid_traffic_marker() {
+  local timeout_seconds="$1"
+  # The exact run-scoped Job is the only log source. The Python filter reads
+  # all bounded output without echoing raw k6 logs, request bodies, or headers.
+  "$TIMEOUT_BIN" --foreground "${timeout_seconds}s" \
+    "$KUBECTL" -n "$TARGET_NAMESPACE" logs "job/$LOADGEN_JOB" -c k6 --tail=200 2>/dev/null \
+    | python3 -c '
+import sys
+
+marker = sys.argv[1]
+matched = False
+for line in sys.stdin:
+    if marker in line:
+        matched = True
+raise SystemExit(0 if matched else 1)
+' "$LOADGEN_TRAFFIC_MARKER"
+}
+
+loadgen_probe_timeout() {
+  local remaining_seconds="$1"
+  (( remaining_seconds > 0 )) || return 1
+  if (( remaining_seconds < LOADGEN_PROBE_TIMEOUT_SECONDS )); then
+    printf '%s\n' "$remaining_seconds"
+  else
+    printf '%s\n' "$LOADGEN_PROBE_TIMEOUT_SECONDS"
+  fi
+}
+
+loadgen_startup_probe_timeout() {
+  local deadline="$1" remaining_seconds
+  # Recompute immediately before every bounded API/log probe. Reusing the
+  # first probe's allowance could let a slow status call push a later log or
+  # confirmation call past the configured startup deadline.
+  remaining_seconds=$(( deadline - $(now_epoch) ))
+  loadgen_probe_timeout "$remaining_seconds"
+}
+
+wait_for_loadgen_traffic() {
+  local deadline status active succeeded failed remaining_seconds probe_timeout sleep_seconds
   deadline=$(( $(now_epoch) + LOADGEN_STARTUP_TIMEOUT_SECONDS ))
   while :; do
-    status=$("$KUBECTL" -n "$TARGET_NAMESPACE" get job "$LOADGEN_JOB" \
-      -o jsonpath='{.status.active}{" "}{.status.failed}' 2>/dev/null || true)
-    read -r active failed <<<"${status:-0 0}"
-    [[ "${active:-0}" =~ ^[1-9][0-9]*$ ]] && return 0
+    probe_timeout=$(loadgen_startup_probe_timeout "$deadline") || {
+      fail "loadgen did not prove paid traffic within ${LOADGEN_STARTUP_TIMEOUT_SECONDS}s"
+      return 1
+    }
+    status=$(loadgen_status "$probe_timeout" 2>/dev/null || true)
+    read -r active succeeded failed <<<"${status:-0 0 0}"
     if [[ "${failed:-0}" =~ ^[1-9][0-9]*$ ]]; then
-      fail "loadgen Job failed before producing traffic"
+      fail "loadgen Job failed before proving paid traffic"
       return 1
     fi
-    if (( $(now_epoch) >= deadline )); then
-      fail "loadgen did not start within ${LOADGEN_STARTUP_TIMEOUT_SECONDS}s"
+    if [[ "${succeeded:-0}" =~ ^[1-9][0-9]*$ ]]; then
+      fail "loadgen Job completed before proving paid traffic"
       return 1
     fi
-    "$SLEEP_BIN" "$POLL_INTERVAL_SECONDS"
+
+    if [[ "${active:-0}" =~ ^[1-9][0-9]*$ ]]; then
+      probe_timeout=$(loadgen_startup_probe_timeout "$deadline") || {
+        fail "loadgen did not prove paid traffic within ${LOADGEN_STARTUP_TIMEOUT_SECONDS}s"
+        return 1
+      }
+      if loadgen_has_paid_traffic_marker "$probe_timeout"; then
+        # Re-read the Job after seeing the marker. A marker from a container
+        # that terminated immediately afterwards is not proof that traffic
+        # remains available for the bounded workflow that follows.
+        probe_timeout=$(loadgen_startup_probe_timeout "$deadline") || {
+          fail "loadgen did not prove paid traffic within ${LOADGEN_STARTUP_TIMEOUT_SECONDS}s"
+          return 1
+        }
+        status=$(loadgen_status "$probe_timeout" 2>/dev/null || true)
+        read -r active succeeded failed <<<"${status:-0 0 0}"
+        if [[ "${failed:-0}" =~ ^[1-9][0-9]*$ ]]; then
+          fail "loadgen Job failed after proving paid traffic"
+          return 1
+        fi
+        if [[ "${succeeded:-0}" =~ ^[1-9][0-9]*$ ]]; then
+          fail "loadgen Job completed after proving paid traffic"
+          return 1
+        fi
+        if [[ "${active:-0}" =~ ^[1-9][0-9]*$ ]]; then
+          log ">> verified paid loadgen traffic before creating the chaos workflow"
+          return 0
+        fi
+      fi
+    fi
+
+    remaining_seconds=$(( deadline - $(now_epoch) ))
+    if (( remaining_seconds <= 0 )); then
+      fail "loadgen did not prove paid traffic within ${LOADGEN_STARTUP_TIMEOUT_SECONDS}s"
+      return 1
+    fi
+    sleep_seconds="$POLL_INTERVAL_SECONDS"
+    (( sleep_seconds > remaining_seconds )) && sleep_seconds="$remaining_seconds"
+    "$SLEEP_BIN" "$sleep_seconds"
   done
+}
+
+ensure_loadgen_remains_active() {
+  local status active succeeded failed
+  status=$(loadgen_status "$LOADGEN_PROBE_TIMEOUT_SECONDS" 2>/dev/null || true)
+  read -r active succeeded failed <<<"${status:-0 0 0}"
+  if [[ "${failed:-0}" =~ ^[1-9][0-9]*$ ]]; then
+    fail "loadgen Job failed after paid traffic was verified"
+    return 1
+  fi
+  if [[ "${succeeded:-0}" =~ ^[1-9][0-9]*$ ]]; then
+    fail "loadgen Job completed before the chaos workflow finished"
+    return 1
+  fi
+  [[ "${active:-0}" =~ ^[1-9][0-9]*$ ]] || {
+    fail "could not confirm loadgen Job remains active during the chaos workflow"
+    return 1
+  }
 }
 
 wait_for_workflow() {
@@ -384,11 +488,15 @@ wait_for_workflow() {
     conditions=$("$KUBECTL" -n "$TARGET_NAMESPACE" get workflow "$WORKFLOW_NAME" \
       -o jsonpath='{range .status.conditions[*]}{.type}={.status}{" "}{end}' \
       2>/dev/null || true)
-    [[ "$conditions" == *"Accomplished=True"* ]] && return 0
     if [[ "$conditions" == *"Failed=True"* ]]; then
       fail "workflow reported failure before all recovery windows completed"
       return 1
     fi
+    # A terminal Workflow only proves that Chaos Mesh stopped. The gate must
+    # still prove the exact paid loadgen Job remained live through that final
+    # observation; otherwise a last-poll race could certify a vacuous fault.
+    ensure_loadgen_remains_active || return 1
+    [[ "$conditions" == *"Accomplished=True"* ]] && return 0
     if (( $(now_epoch) >= deadline )); then
       fail "workflow did not complete within ${WORKFLOW_TIMEOUT_SECONDS}s"
       return 1
@@ -492,9 +600,9 @@ main() {
   acquire_lock || return 1
   ensure_no_other_gate_run || return 1
   ensure_target_ready || return 1
-  create_workflow || return 1
   create_loadgen || return 1
-  wait_for_loadgen_start || return 1
+  wait_for_loadgen_traffic || return 1
+  create_workflow || return 1
 
   if ! wait_for_workflow; then
     FAILED_EXPERIMENTS+=("workflow")

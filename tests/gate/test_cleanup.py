@@ -68,7 +68,11 @@ if [[ "$args" == *" label workflow "* || "$args" == *" label job "* ]]; then exi
 if [[ "$args" == *" create job --from=cronjob/loadgen "* ]]; then exit 0; fi
 if [[ "$args" == *" get job loadgen-gate-test-1 "* ]]; then
   [[ -f {state}/job-deleted ]] && exit 1
-  echo '1 0'; exit 0
+  echo '1 0 0'; exit 0
+fi
+if [[ "$args" == *" logs job/loadgen-gate-test-1 "* ]]; then
+  printf '%s\n' 'INFO[0001] RESILIENCE_GATE_PAID_TRAFFIC_READY v1 source=console'
+  exit 0
 fi
 if [[ "$args" == *" get workflow chaos-gate-run-1 "* ]]; then
   [[ -f {state}/workflow-deleted ]] && exit 1
@@ -138,6 +142,9 @@ def test_failed_score_cleans_only_its_exact_objects_and_verifies_absence(tmp_pat
     assert "delete lease chaos-gate-runner --ignore-not-found --wait=true" in calls
     assert "delete workflow -l" not in calls
     assert "delete job -l" not in calls
+    assert calls.index("create job --from=cronjob/loadgen") < calls.index(
+        "logs job/loadgen-gate-test-1"
+    ) < calls.index("workflow.yaml")
 
 
 def test_pre_annotation_runner_still_preserves_the_gate_verdict(tmp_path: Path) -> None:
@@ -219,6 +226,20 @@ def test_lock_and_target_permissions_match_the_orchestrator_contract() -> None:
     )
     assert any(
         rule["resources"] == ["jobs"] and "patch" in rule["verbs"]
+        for rule in runner_rules
+    )
+    assert {
+        "apiGroups": [""],
+        "resources": ["pods"],
+        "verbs": ["list"],
+    } in runner_rules
+    assert {
+        "apiGroups": [""],
+        "resources": ["pods/log"],
+        "verbs": ["get"],
+    } in runner_rules
+    assert not any(
+        rule["resources"] == ["pods"] and "get" in rule["verbs"]
         for rule in runner_rules
     )
 

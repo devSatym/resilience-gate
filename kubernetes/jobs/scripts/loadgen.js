@@ -100,9 +100,11 @@ const REDIRECT_PROBE_URL = environment('REDIRECT_PROBE_URL');
 const DEV_BASELINE_URL = 'http://url-shortener-dev.url-shortener-dev.svc.cluster.local';
 const MAX_BASELINE_DURATION_MS = 90 * 1000;
 const SUMMARY_MARKER = 'RESILIENCE_GATE_K6_SUMMARY ';
+const PAID_TRAFFIC_READY_MARKER = 'RESILIENCE_GATE_PAID_TRAFFIC_READY v1';
 
 let scenarios;
 let thresholds;
+let paidTrafficReadyReported = false;
 
 if (TRAFFIC_MODE === 'unpaid-baseline') {
   scenarios = {
@@ -462,6 +464,12 @@ export function paymentFlow() {
 
   const redirected = created && redirectFromShorten(shorten, appUrl);
   endToEndSuccessRate.add(Boolean(created && redirected));
+  // This fixed marker has no request, payment, endpoint, or wallet data. The
+  // gate reads it only from this exact run-scoped Job before starting PodChaos.
+  if (TRAFFIC_MODE === 'paid' && PAYMENT_ENABLED && created && redirected && !paidTrafficReadyReported) {
+    console.log(PAID_TRAFFIC_READY_MARKER);
+    paidTrafficReadyReported = true;
+  }
   endToEndDuration.add(Date.now() - started);
 
   if (LOAD_PROFILE === 'closed-loop') sleep(SLEEP_SECONDS);

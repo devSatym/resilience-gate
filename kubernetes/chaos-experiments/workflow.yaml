@@ -13,7 +13,7 @@ metadata:
     app.kubernetes.io/part-of: resilience-gate
     # The runner refuses to begin while an earlier object with this selector
     # remains. Its own generated Workflow is additionally labelled with a
-    # unique run id before load generation starts.
+    # unique run id after the run-scoped loadgen has proved paid traffic.
     resilience-gate.io/gate: chaos
 spec:
   entry: gate-serial
