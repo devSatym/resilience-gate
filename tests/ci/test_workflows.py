@@ -28,7 +28,7 @@ def checkout_steps(job: dict) -> list[dict]:
     return [
         step
         for step in job["steps"]
-        if isinstance(step, dict) and step.get("uses") == "actions/checkout@v4"
+        if isinstance(step, dict) and step.get("uses") == "actions/checkout@v7"
     ]
 
 
@@ -44,7 +44,7 @@ def test_pull_request_validation_never_receives_publish_credentials() -> None:
         assert "github.event_name == 'workflow_dispatch'" in publish["if"]
         assert "github.ref == 'refs/heads/main'" in publish["if"]
         assert publish["permissions"] == {"contents": "read", "id-token": "write"}
-        assert "google-github-actions/auth@v2" not in str(validate)
+        assert "google-github-actions/auth@v3" not in str(validate)
         assert "contents: write" not in raw
         assert "git push" not in raw
         assert "ajprojectplatform" not in raw
@@ -63,7 +63,7 @@ def test_delivery_waits_for_validation_and_records_a_verified_digest() -> None:
         assert ":latest" not in raw
         assert "cosign sign --yes" in raw
         assert "cosign verify" in raw
-        assert "actions/upload-artifact@v4" in raw
+        assert "actions/upload-artifact@v7" in raw
 
 
 def test_all_workflows_disable_checkout_credential_persistence() -> None:
@@ -80,9 +80,9 @@ def test_validation_workflow_is_credential_free_and_has_platform_tooling() -> No
 
     assert "id-token: write" not in raw
     assert "google-github-actions/auth" not in raw
-    assert "hashicorp/setup-terraform@v3" in raw
-    assert "azure/setup-helm@v4" in raw
-    assert "azure/setup-kubectl@v4" in raw
+    assert "hashicorp/setup-terraform@v4" in raw
+    assert "azure/setup-helm@v5" in raw
+    assert "azure/setup-kubectl@v5" in raw
     assert parsed["permissions"] == {"contents": "read"}
 
     gate_runner = parsed["jobs"]["gate-runner"]

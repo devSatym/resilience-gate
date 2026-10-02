@@ -22,16 +22,16 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.21.2
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.15.8
       - name: Install locked test environments
@@ -59,7 +59,7 @@ jobs:
       GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
       IMAGE: ${{ vars.GAR_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/radius-signer
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Require configured portable publishing inputs
@@ -67,17 +67,17 @@ jobs:
           test -n "$GAR_LOCATION"
           test -n "$GCP_PROJECT_ID"
           test -n "$GAR_REPOSITORY"
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_PUBLISHER_SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
       - name: Configure private registry authentication
         run: gcloud auth configure-docker "${GAR_LOCATION}-docker.pkg.dev" --quiet
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build and push immutable signer candidate
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./signer
           file: ./signer/Dockerfile
@@ -86,7 +86,7 @@ jobs:
           tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
           cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@v4.1.2
       - name: Sign and verify signer digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -128,7 +128,7 @@ jobs:
               + "\n"
           )
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: signer-image-metadata
           path: signer-image-metadata.json
