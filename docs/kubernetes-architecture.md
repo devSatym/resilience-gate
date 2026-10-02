@@ -136,7 +136,7 @@ can be reproduced.
 
 | Failure or ambiguity | Design response in source | Remaining limit |
 | --- | --- | --- |
-| Public identifiers are absent, unrendered, or inconsistent. | The renderer and bootstrap preflight are designed to reject unresolved or unsafe input before mutation. | This has not been exercised against an operator account or cluster here. |
+| Public identifiers are absent, unrendered, or inconsistent. | The renderer and bootstrap preflight are designed to reject unresolved or unsafe input before mutation. | The named owned-lab path used one reviewed rendering; rejection of every invalid-input variant remains source/test coverage. |
 | Current kube context is wrong. | Mutating bootstrap phases require the configured GKE context exactly. | Context checks do not prove that the target itself is safe or funded. |
 | A tag moves after candidate discovery. | The Warehouse discovers constrained tags, but stage templates use `imageFrom(...).Digest` for rendered workload identity. | A digest still needs a real build, signature verification, retention, and live record. |
 | An application process is alive while a dependency is unavailable. | Liveness and readiness are separate; readiness can remove an unready endpoint without asserting the process is dead. | The recorded gate observed selected PostgreSQL, Redis, and signer faults/recovery only; it does not cover all workload failure modes. |

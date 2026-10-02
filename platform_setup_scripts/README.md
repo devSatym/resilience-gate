@@ -66,11 +66,12 @@ failure, not a warning or implicit override.
 
 ## Verification status
 
-These scripts and their tests define a guarded bootstrap contract; they are not
-evidence that a project, cluster, controller, secret backend, or GitOps
-application has been created. This repository currently has no recorded cloud
-or Kubernetes execution. A rendered configuration diff, dry run, or local test
-does not establish a successful bootstrap or release.
+These scripts and their tests define a guarded bootstrap contract. The linked
+staging-testnet evidence records show that the owned cluster, selected
+controllers, GitOps reconciliation, and bounded gate path ran for named
+executions; they are not complete provisioning history, teardown evidence, or a
+production-like release claim. A rendered configuration diff, dry run, or local
+test still does not establish a successful bootstrap or release.
 
 Keep live results in the sanitized [evidence
 directory](../docs/evidence/README.md), bound to the exact source and artifact
