@@ -1,13 +1,10 @@
 # This is a production-like testnet Stage, not a live-network release target.
-# Bootstrap keeps it inactive until the later immutable chaos verification is
-# wired; the annotation gives that handoff an explicit machine-readable guard.
+# Its Project policy keeps promotion manual after staging verification.
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
   name: prod
   namespace: resilience-gate
-  annotations:
-    resilience-gate.io/activation: deferred-until-c089
   labels:
     app.kubernetes.io/part-of: resilience-gate
     resilience-gate.io/scope: testnet-only

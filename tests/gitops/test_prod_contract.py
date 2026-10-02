@@ -23,7 +23,7 @@ def test_prod_can_only_receive_staging_freight_and_stays_manually_promoted() -> 
 
     assert stage["metadata"]["name"] == "prod"
     assert stage["metadata"]["namespace"] == "resilience-gate"
-    assert stage["metadata"]["annotations"]["resilience-gate.io/activation"] == "deferred-until-c089"
+    assert "resilience-gate.io/activation" not in stage["metadata"].get("annotations", {})
     assert stage["spec"]["requestedFreight"] == [
         {
             "origin": {"kind": "Warehouse", "name": "resilience-gate"},
