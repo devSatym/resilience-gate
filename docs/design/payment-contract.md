@@ -1,8 +1,9 @@
 # Payment contract: x402 v2 with Permit2
 
-**Status:** design and implementation contract. It describes the behavior that
-the application, signer, and test tooling must agree on. It is not evidence of
-a deployed service, a funded wallet, or a successful on-chain settlement.
+**Status:** implemented contract with a bounded owned-testnet smoke. The
+recorded sequence observed `402 → signed 201 → redirect 302 → replay 409` and
+retained a sanitized receipt. This remains narrower than an audited settlement,
+custody, or production-payment claim.
 
 ## Scope and ownership
 
@@ -193,8 +194,9 @@ failure during a resilience test.
 
 ## Evidence boundary
 
-Unit tests can prove codec behavior, term comparison, response validation, and
-signature recovery with deterministic fixtures. They do not prove a real
-facilitator, funded wallet, or chain transaction. Any testnet execution claim
-requires separately captured, sanitized evidence that identifies the source
-revision, configuration, signer image, and settlement result.
+Unit tests prove codec behavior, term comparison, response validation, and
+signature recovery with deterministic fixtures. The final paid smoke added a
+sanitized live record bound to source, rendered, application, signer,
+gate-runner, and load-generator identity while omitting sensitive payment data.
+It proves that bounded invocation only; every later testnet execution still
+needs its own record.

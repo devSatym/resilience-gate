@@ -1,18 +1,19 @@
 # Production-like smoke evidence status
 
-**Status: not collected.** Resilience Gate has not run a production-like smoke
-test from this workspace. The `prod` name in this repository denotes a
-testnet-only, production-like environment; it is not a mainnet or public
-production release.
+**Status: passed on 2 October 2026.** Resilience Gate completed a Kargo-managed
+production-like testnet promotion and post-deploy smoke. The `prod` name still
+denotes an owned testnet environment, never mainnet or public production.
 
-## Future smoke-test record
+## Recorded smoke result
 
-An approved manual smoke test must identify the promoted source revision,
-rendered-branch revision, immutable workload and runtime digests, target
-context, and exact stage approval boundary. It should retain sanitized
-readiness, a bounded request/result summary, and a clear pass, fail, blocked,
-or unavailable outcome. It must not bypass the staging verification contract
-or turn an unverified manual patch into a release claim.
+Run `prod-smoke-20261002-060326` identifies the promoted source, rendered
+revision, immutable workload, target context, Freight, Promotion, AnalysisRun,
+and exact upstream staging boundary. Kargo reported the Promotion `Succeeded`;
+the AnalysisRun, readiness metric, and liveness metric were `Successful`; Argo
+CD was Synced/Healthy at the rendered revision; the app was 3/3 Ready and both
+stateful dependencies were Ready.
 
-No such artifacts are present today, so no production-like release has been
-verified.
+The detailed sanitized bundle and cleanup receipt remain outside Git. The
+[verification report](../../verification-report.md) records the reviewed
+identities and result. This is a verified production-like **testnet** result,
+not a mainnet or public-production release.

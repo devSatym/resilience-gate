@@ -1,10 +1,9 @@
 # Owned testnet lab lifecycle
 
-**Status: operational contract, not complete provisioning history.** The
-commands in this runbook are designed for the owned Resilience Gate testnet
-lab. The repository has narrow evidence that a staging lab and selected
-workloads/controllers ran, but it does not claim complete project/cluster
-provisioning history or a successful teardown.
+**Status: operational contract exercised by the owned Resilience Gate testnet
+lab.** The final snapshot verifies the active cluster, controllers, secrets,
+GitOps resources, workloads, promotion path, and cleanup. No teardown has been
+performed or claimed.
 
 `platform_setup_scripts/config.env` is ignored local operator input. It may
 contain public project, registry, and cluster identifiers, but never Secret
@@ -50,8 +49,8 @@ dry-run guard enabled:
 This is planning and review assistance, not approval to create infrastructure.
 Review rendered manifests, the intended project and cluster identity, and any
 saved Terraform plan before separately invoking the guarded bootstrap workflow.
-The bootstrap orchestrator currently stops after phase 06; verification is a
-separate read-only command, not a bootstrap phase.
+The bootstrap orchestrator stops after phase 06; `07-verify.sh` remains a
+separate read-only command, not a mutating bootstrap phase.
 
 ## Review a scoped teardown plan
 

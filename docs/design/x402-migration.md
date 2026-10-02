@@ -1,10 +1,10 @@
 # x402 and Permit2 design status
 
-**Status: implemented source contract with one bounded owned-testnet
-observation.** A direct interaction observed `402 → signed 201 → replay 409`.
-No separately versioned payment-evidence bundle is retained, so this note must
-not be read as proof of audited settlement, wallet funding, custody, or an
-on-chain transaction finality claim.
+**Status: implemented source contract with a sanitized bounded owned-testnet
+receipt.** The interaction observed
+`402 → signed 201 → redirect 302 → replay 409`. The receipt intentionally omits
+wallet, signature, payment-header, and transaction identifiers, so this note
+must not be read as proof of audited settlement, custody, or chain finality.
 
 ## Intended request path
 
@@ -62,8 +62,9 @@ settings. This repository does not claim mainnet support, a real merchant
 integration, wallet custody controls beyond the described process boundary, or
 production payment availability.
 
-Offline tests can validate codecs, requirements comparison, response handling,
-and signing behavior with fixtures. A verified payment claim still requires a
-separately sanitized, retained record that identifies the source revision,
-immutable workload and signer identities, configuration scope, and actual
-settlement result. The recorded interaction does not satisfy that higher bar.
+Offline tests validate codecs, requirements comparison, response handling, and
+signing behavior with fixtures. The final paid smoke adds one separately
+sanitized record identifying the source, rendered revision, immutable workload
+and signer identities, configuration scope, and observed result. It satisfies
+the project's bounded testnet smoke requirement, not a broader payment-system
+or custody claim.

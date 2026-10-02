@@ -84,7 +84,7 @@ loki:
       storageClass: standard
       size: 10Gi
   # The upstream chunks-cache default reserves about 9.8Gi, which cannot fit
-  # on this two-node e2-standard-2 lab. Keep the cache behavior but size its
+  # on this bounded two-node lab. Keep the cache behavior but size its
   # managed memcached allocation to the same bounded 1Gi profile as results.
   chunksCache:
     enabled: true

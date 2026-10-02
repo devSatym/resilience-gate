@@ -1,10 +1,9 @@
 # Chaos-gate verification runbook
 
-**Status: implementation guide, not an exhaustive live-run history.** Scoped
-staging-testnet records are available under [evidence](../evidence/README.md),
-including a Kargo-managed pass, linked re-verification, and manual boundary
-tests. A successful local test, rendered manifest, or read-only verifier still
-does not establish that a release passed.
+**Status: verified operating procedure.** The final owned-testnet campaign used
+this path for baseline, deliberately degraded staging, corrected chaos/recovery,
+and production-like smoke. Historical and final status are indexed under
+[evidence](../evidence/README.md); a later candidate still needs a fresh run.
 
 Use this runbook only for the explicitly owned Resilience Gate testnet lab. A
 namespace named `prod` is a production-like testnet boundary, never a mainnet

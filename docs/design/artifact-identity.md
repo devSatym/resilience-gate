@@ -1,8 +1,9 @@
 # Artifact identity and immutable delivery policy
 
-**Status:** design and CI contract. It defines what a promotable artifact must
-look like; it does not claim that an image has been built, signed, published,
-or deployed.
+**Status:** implemented CI and promotion contract, exercised by the owned
+testnet validation campaign. The recorded result binds source, rendered
+revision, digest-qualified runtime images, and gate identities. A new candidate
+must produce a new identity and verification record.
 
 ## Core rule
 
@@ -129,6 +130,7 @@ it does not change the rule that the runtime reference itself is immutable.
 ## Evidence boundary
 
 A successful build, signature verification, or manifest render is not a live
-release claim. Live testnet evidence is recorded separately only after the
-referenced source, chart, gate, and runtime digests are actually exercised in
-the owned lab.
+release claim. The completed testnet campaign separately exercised and recorded
+the referenced source, rendered revision, gate, and runtime identities. See the
+[verification report](../verification-report.md). Future artifacts remain
+unverified until they repeat that path.

@@ -17,5 +17,6 @@ it is not a new application candidate or a production-like promotion.
    logged cleanup.
 
 The second record demonstrates the corrected gate behavior for that same
-staging candidate. It does not claim a new source candidate, baseline,
-regression exercise, production-like smoke, or broadly verified release.
+staging candidate. A later final campaign separately tested a deliberately
+degraded source candidate, corrected recovery candidate, and production-like
+promotion; the historical pair remains scoped to its own identity.

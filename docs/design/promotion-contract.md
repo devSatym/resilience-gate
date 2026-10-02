@@ -28,9 +28,9 @@ workload identity.
 
 Development may auto-promote after its normal service-health verification.
 Staging accepts Freight only from development and remains manually promoted.
-The production-like testnet Stage accepts Freight only from staging, remains
-manual, and carries an explicit deferred-activation annotation until the later
-immutable chaos-gate integration is reviewed.
+The production-like testnet Stage accepts Freight only from staging and remains
+manual. Its readiness and liveness verification runs only after the candidate
+has passed the upstream staging health and chaos contracts.
 
 The Git credential is an ExternalSecret backed by the shared
 `resilience-gate-secrets` ClusterSecretStore. Its value is never stored in
@@ -38,7 +38,7 @@ Git, CI variables, generated manifests, or command arguments. Kargo's
 rendered-branch `git-push` is attributable to that restricted GitOps identity;
 ordinary CI only publishes and signs candidate artifacts.
 
-## Explicitly deferred actions
+## Explicit operator actions
 
 Phase 06 does not invoke a Kargo Promotion, force an Argo CD sync, create a
 load-generation Job, install or run a Chaos Mesh experiment, or declare a
@@ -49,3 +49,8 @@ failure blocks the relevant later action instead of being bypassed here.
 Before any manual testnet promotion, an operator must review the exact Freight
 digest, rendered branch commit, stage policy, application health, and the
 evidence requirements documented by the later gate and operations runbooks.
+
+The 2 October 2026 verification campaign exercised this path through all three
+Stages, including a negative candidate that failed staging and a corrected
+candidate that completed production-like post-deploy verification. See the
+[verification report](../verification-report.md).

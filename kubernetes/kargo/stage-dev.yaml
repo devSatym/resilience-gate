@@ -1,6 +1,6 @@
 # Run `make render-config` before applying this manifest. This is configuration
-# for the owned testnet chain; bootstrap deliberately defers live promotion
-# activation until the complete verification gate is available.
+# for the owned testnet chain; dev may auto-promote, while staging and prod keep
+# their explicit manual verification boundaries.
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:

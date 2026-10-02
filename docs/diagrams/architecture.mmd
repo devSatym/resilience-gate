@@ -1,18 +1,25 @@
-%% Conceptual source diagram for Resilience Gate. It is not a deployed-state
-%% diagram or evidence of a successful promotion.
+%% Conceptual source diagram for Resilience Gate. Live outcomes are recorded
+%% separately; the diagram itself is not evidence.
 flowchart LR
-  source[Reviewed source on main] --> identity[Revision and OCI digest]
-  identity --> warehouse[Kargo Warehouse]
-  warehouse --> dev[dev policy]
-  dev --> staging[manual staging]
-  staging --> gate[bounded chaos gate]
-  gate --> prod[manual prod-like testnet]
+  developer[Developer] -->|push| ci[GitHub Actions]
+  ci -->|OIDC publish and Cosign| registry[Artifact Registry]
+  ci -->|source revision| warehouse[Kargo Warehouse]
+  registry -->|OCI digest| warehouse
 
-  source --> render[Rendered env branches]
-  render --> argo[Argo CD Applications]
-  argo --> workload[Digest-pinned workload]
+  warehouse --> dev[dev: auto and health]
+  dev --> staging[staging: manual, health, chaos]
+  staging --> prod[prod-like: manual and smoke]
 
-  workload -. metrics and logs when installed .-> telemetry[Prometheus, Loki, Grafana]
-  telemetry -. score inputs .-> gate
+  dev -->|render env/dev| argo[Argo CD]
+  staging -->|render env/staging| argo
+  prod -->|render env/prod| argo
+  argo --> workloads[GKE workloads]
 
-  gate --> evidence[Sanitized evidence records]
+  terraform[Terraform] -->|GCP foundation| workloads
+  secrets[GCP Secret Manager and ESO] --> workloads
+  load[k6 and isolated Permit2 signer] -->|paid testnet traffic| workloads
+  chaos[Chaos Mesh] -->|bounded dependency faults| workloads
+  workloads --> telemetry[Prometheus, Loki, Grafana]
+  telemetry --> scorer[Fail-closed scorer]
+  scorer -->|PASS or FAIL| staging
+  scorer --> evidence[Sanitized evidence]

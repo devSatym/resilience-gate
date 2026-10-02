@@ -18,6 +18,7 @@ includes the sanitized gate log and scorecards for PostgreSQL (6 checks), Redis
 (7 checks), and signer (6 checks). Each scorecard records that its target was
 observed unavailable and recovered within its bounded window.
 
-This pass supports only that recorded staging identity and scenario. It does
-not replace baseline evidence, a deliberately degraded pipeline regression,
-or a production-like smoke test.
+This pass supports only that recorded staging identity and scenario. The later
+full campaign separately collected baseline, deliberately degraded pipeline,
+corrected recovery, and production-like smoke records; it did not reuse this
+run as a substitute.

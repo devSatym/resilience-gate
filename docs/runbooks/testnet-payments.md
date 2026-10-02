@@ -74,6 +74,11 @@ The expected sequence is:
    proving the application-level settlement identifier guard saw the duplicate
    facilitator result.
 
+The recorded owned-testnet smoke additionally verified the created URL's `302`
+redirect and retained a sanitized receipt without wallet, signature,
+payment-header, or transaction identifiers. See the
+[verification report](../verification-report.md).
+
 `402` at the first step is success for this smoke. A `402` at the signed step
 usually means the chosen wallet has insufficient balance or allowance, the
 signature terms differ from the server-owned challenge, or the authorization

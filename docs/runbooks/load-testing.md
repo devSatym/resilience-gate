@@ -9,6 +9,10 @@ Do not point this tooling at a production network. The load script rejects a
 network other than `eip155:72344`, and the in-cluster CronJob is scoped to
 `url-shortener-staging`.
 
+The final validation campaign exercised this path for the paid smoke, negative
+traffic gate, and successful recovery run. Treat those records as historical;
+every new candidate requires a new bounded Job and result.
+
 ## Before a run
 
 Confirm all of the following with the environment owner:

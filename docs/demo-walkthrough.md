@@ -69,12 +69,13 @@ rendered diff through the normal project workflow before continuing elsewhere.
 
 ## 5. Understand the live-evidence boundary
 
-This walkthrough produces no live evidence. Separately collected, scoped
-staging-testnet records are available under [evidence](evidence/), but they do
-not make this offline walkthrough a release verification. A future approved
-lab exercise still needs fresh sanitized metadata and artifacts for its exact
-source revision, rendered revision, workload and runtime digests, target scope,
-traffic window, scorecards, and cleanup checks.
+This walkthrough produces no live evidence. The separately completed owned-lab
+campaign is documented in the [verification report](verification-report.md)
+and [evidence index](evidence/README.md), but those records do not turn a later
+offline run into release verification. Every new candidate needs fresh
+sanitized metadata and artifacts for its exact source revision, rendered
+revision, workload and runtime digests, target scope, traffic window,
+scorecards, and cleanup checks.
 
 Until that happens, the truthful demo conclusion is:
 

@@ -1,21 +1,22 @@
 # Regression-blocked evidence status
 
-**Status: not collected.** No intentionally degraded candidate has been
-deployed or evaluated from this workspace. This directory does not prove that
-the promotion gate rejected a regression.
+**Status: collected as an expected failure on 2 October 2026.** A
+pipeline-produced deliberately degraded candidate entered the staging
+verification path and failed before fault injection because it could not prove
+paid traffic within the configured 75-second startup window.
 
-## Future negative-test record
+## Recorded negative-test result
 
-An approved regression exercise should identify the deliberately degraded
-candidate by source revision and immutable digest, state the reviewed reason it
-is expected to be rejected, and preserve the gate result, relevant scorecards,
-sanitized telemetry, and run-scoped cleanup record. Its outcome must be
-recorded as `fail` or `blocked` as applicable; a blocked regression is useful
-negative evidence only when the blocking reason is explicit and reviewable.
+Run `regression-blocked-20261002-050844` identifies the degraded source and
+rendered revision, Kargo AnalysisRun, gate Job/Pod, sanitized gate log, and
+cleanup. The gate acquired its Lease and created the load Job, then failed
+closed before chaos because meaningful paid traffic was absent. The outcome is
+`fail`, which is the correct passing result for this negative test objective.
 
 Do not label a manually patched workload, a mutable tag, or a locally rendered
 overlay as a verified pipeline regression. It must travel through the intended
 testnet verification path before it can support that claim.
 
-The direct boundary tests in sibling directories are not deliberately degraded,
-pipeline-produced Freight and do not change this status.
+The detailed sanitized bundle remains outside Git; see the
+[verification report](../../verification-report.md). Direct boundary tests in
+sibling directories remain narrower than this pipeline-produced regression.

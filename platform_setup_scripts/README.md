@@ -1,8 +1,9 @@
 # Platform bootstrap
 
 These scripts bootstrap the prerequisite GKE controllers for Resilience Gate.
-They make no claim that an environment is already provisioned; each phase is
-safe to inspect locally and requires explicit operator input before mutation.
+Each phase is safe to inspect locally and requires explicit operator input
+before mutation. The private testnet lab has been provisioned and verified with
+this workflow; a new environment must still establish its own result.
 
 ## Safe first run
 
@@ -66,12 +67,15 @@ failure, not a warning or implicit override.
 
 ## Verification status
 
-These scripts and their tests define a guarded bootstrap contract. The linked
-staging-testnet evidence records show that the owned cluster, selected
-controllers, GitOps reconciliation, and bounded gate path ran for named
-executions; they are not complete provisioning history, teardown evidence, or a
-production-like release claim. A rendered configuration diff, dry run, or local
-test still does not establish a successful bootstrap or release.
+The 2 October 2026 campaign verified the owned GKE cluster, controller
+availability, ClusterSecretStore and ExternalSecrets, eight Synced/Healthy
+Argo CD Applications, all three Kargo Stages, the staging chaos path, and the
+production-like testnet promotion. See the
+[verification report](../docs/verification-report.md).
+
+A rendered diff, dry run, or local validation still does not establish a new
+environment or a later release. Every bootstrap target needs its own read-only
+verification and evidence.
 
 Keep live results in the sanitized [evidence
 directory](../docs/evidence/README.md), bound to the exact source and artifact

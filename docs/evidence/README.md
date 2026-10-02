@@ -5,12 +5,13 @@ approved Resilience Gate scenario in the owned testnet lab. It is never a
 place for Kubernetes Secret contents, wallet keys, payment signatures,
 authorization headers, cookies, raw configuration files, or mainnet claims.
 
-The repository now contains a small, sanitized set of **owned staging-testnet**
-records: one Kargo-managed chaos-gate pass, its earlier failed predecessor and
-fresh re-verification, plus four manual direct boundary tests of the deployed
-gate runner. They establish only the exact scenarios and immutable identities
-captured in their run metadata. They do not establish a production-like smoke
-result, a full release, mainnet behavior, or a general availability claim.
+The repository contains a small, sanitized set of versioned
+**owned staging-testnet** records: one Kargo-managed chaos-gate pass, an earlier
+failed predecessor and fresh re-verification, plus four manual direct boundary
+tests. A later full validation campaign also completed baseline, paid smoke,
+deliberate regression, corrected recovery, and production-like promotion. Its
+detailed sanitized bundles remain outside Git by default; the reviewed result
+is documented in the [verification report](../verification-report.md).
 
 A passing unit test, rendered manifest, accepted Kargo request, or empty
 scenario directory is not evidence that a release gate passed. Likewise, the
@@ -36,9 +37,19 @@ detail.
 | [missing telemetry](missing-telemetry/20261002-missing-telemetry-scorer/) | **Fail.** A scorer-only direct test treated a deliberately unreachable Prometheus endpoint as transport-error evidence. |
 | [short deadline cleanup](timeout-cleanup/20261002-timeout-cleanup/) | **Fail.** A direct runner test with a one-second deadline invoked exact-object cleanup before its normal fault phase. |
 
-`baseline`, `regression-blocked`, and `prod-smoke` remain **not collected**.
-In particular, no intentionally degraded candidate has traveled through the
-Kargo promotion path, and no production-like testnet smoke has run.
+The final campaign additionally recorded:
+
+| Record | Outcome and narrow meaning |
+| --- | --- |
+| `baseline-20261002-031523` | **Pass.** Dev sustained bounded traffic with zero 5xx responses, 95 ms p95 latency, and ready PostgreSQL/Redis signals. |
+| `paid-smoke-20261002-043614` | **Pass.** Staging observed `402 → 201 → 302 → replay 409` with a sanitized receipt and no payment identities emitted. |
+| `regression-blocked-20261002-050844` | **Expected fail.** A pipeline-produced degraded candidate could not prove paid traffic and stopped before fault injection. |
+| `recovery-20261002-052031` | **Pass.** A corrected staging candidate completed all three fault/recovery scorecards and cleanup. |
+| `prod-smoke-20261002-060326` | **Pass.** Kargo promotion, Argo CD reconciliation, readiness, liveness, 3/3 app replicas, and stateful dependencies all passed. |
+
+These final bundles are not silently represented by empty directories. Their
+status pages point to the report, and their external retention boundary is
+explicit.
 
 ## Use the reviewed verification path
 
@@ -142,3 +153,11 @@ values, then validates the resulting metadata without a cloud dependency.
   test. Record it separately as a candidate or regression exercise.
 - The sanitizer is a safety layer, not authorization to upload raw diagnostics.
   Review output for sensitive material before it enters Git.
+
+## Final evidence audit
+
+The completed campaign validated 16 metadata records and 238 retained files.
+The final scan found no symlinks, raw-named artifacts, sensitive identity
+patterns, or suspicious long encoded data. Wallet-key and secret-data
+redactions were explicitly recorded where applicable. No raw bundle should be
+copied into this directory without repeating that review.

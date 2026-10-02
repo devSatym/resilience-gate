@@ -1,11 +1,10 @@
 # Resilience Gate architecture
 
-**Status: repository design and source map with scoped staging-testnet
-evidence.** This document describes the contracts represented by the source and
-manifests. The linked evidence records selected staging reconciliation,
-dependency fault/recovery scoring, and cleanup, but are not complete
-provisioning history, payment settlement proof, or production-like promotion
-evidence.
+**Status: implemented and verified in the private owned-testnet lab.** The
+source and manifests below were exercised through dev baseline, staging paid
+traffic, negative gating, healthy chaos, recovery, and a production-like
+promotion. The [verification report](verification-report.md) captures the
+exact snapshot and evidence boundary.
 
 Resilience Gate is deliberately testnet-only. A directory or namespace called
 `prod` represents a production-like testnet boundary, never a mainnet or
@@ -17,12 +16,12 @@ The platform is designed to promote an immutable workload identity through
 reviewed environments only after the configured checks for that stage succeed.
 It separates four concerns:
 
-| Concern | Source contract | What it does not establish by itself |
+| Concern | Implemented contract | Verified observation |
 | --- | --- | --- |
-| Workload | `app/` implements a FastAPI URL shortener; `signer/` is a separate Permit2-signing boundary. | A running service, funded wallet, or settled payment. |
-| Delivery | Helm values accept digest-qualified image identities, while Kargo templates render environment branches. | That an image was built, signed, pushed, or reconciled. |
-| Verification | The chaos gate is a bounded Job/Workflow design that binds source and workload identity to scorecards. | That any fault ran safely or that its score passed. |
-| Evidence | `docs/evidence/` defines sanitized artifacts for a reviewed lab run. | A live result when the artifact directories are empty. |
+| Workload | `app/` implements a FastAPI URL shortener; `signer/` is a separate Permit2-signing boundary. | Dev/staging/prod workloads were Ready; the staging paid smoke completed its challenge, settlement, redirect, and replay sequence. |
+| Delivery | Helm values accept digest-qualified image identities, while Kargo templates render environment branches. | All three rendered branches were reconciled; eight Argo CD Applications were Synced/Healthy. |
+| Verification | The chaos gate binds source and workload identity to one bounded Job/Workflow and fail-closed scorecards. | PostgreSQL, Redis, and signer fault/recovery scoring passed for the corrected candidate; a degraded candidate failed before chaos when traffic was absent. |
+| Evidence | Schemas, collectors, sanitizers, and retained summaries bind each result to the observed run. | Sixteen metadata records and 238 retained files passed the final evidence audit. |
 
 ## Configured component map
 
@@ -74,9 +73,8 @@ The Kargo Project is named `resilience-gate`. Its policy declares development
 as the only automatic stage, while staging and the production-like testnet
 stage require an explicit promotion. The Warehouse may discover a constrained
 `sha-*` tag, but stage templates render the Freight's OCI digest into the
-environment values. The `prod` Stage manifest also carries an explicit
-deferred-activation annotation; its presence is a configuration guard, not an
-activation or promotion record.
+environment values. The production-like Stage is active and retains its
+explicit manual-promotion boundary.
 
 ### Observability configuration
 
@@ -97,15 +95,15 @@ bounded load, create the constrained workflow, score its telemetry, and verify
 cleanup on exit. Its scorer treats empty, malformed, non-finite, insufficient,
 or stale telemetry as evidence failure rather than a healthy zero.
 
-The configured production-like stage instead uses post-deploy liveness and
-readiness checks after its upstream staging boundary. That separation is
-intentional: a post-deploy smoke check cannot replace a prior chaos-gate
-result. It also does not prove that either check has been executed.
+The production-like stage uses post-deploy liveness and readiness checks after
+its upstream staging boundary. That separation is intentional: a post-deploy
+smoke check cannot replace a prior chaos-gate result. The recorded final path
+successfully executed both layers in order.
 
 ## Intended promotion path
 
-The following is a conceptual rendering of the repository configuration. It
-does not show a historical run or a deployed topology.
+The following is the configuration flow. The recorded verification followed
+this route; the diagram itself is explanatory rather than evidence.
 
 ```mermaid
 flowchart LR
@@ -140,12 +138,12 @@ can be reproduced.
 | Current kube context is wrong. | Mutating bootstrap phases require the configured GKE context exactly. | Context checks do not prove that the target itself is safe or funded. |
 | A tag moves after candidate discovery. | The Warehouse discovers constrained tags, but stage templates use `imageFrom(...).Digest` for rendered workload identity. | A digest still needs a real build, signature verification, retention, and live record. |
 | An application process is alive while a dependency is unavailable. | Liveness and readiness are separate; readiness can remove an unready endpoint without asserting the process is dead. | The recorded gate observed selected PostgreSQL, Redis, and signer faults/recovery only; it does not cover all workload failure modes. |
-| Payment authorization is invalid or the facilitator is unavailable. | The app rejects invalid authorization and treats facilitator transport/response failure as unavailable rather than settled. | A direct `402 → signed 201 → replay 409` testnet observation has no separately versioned evidence bundle; it is not settlement or production assurance. |
+| Payment authorization is invalid or the facilitator is unavailable. | The app rejects invalid authorization and treats facilitator transport/response failure as unavailable rather than settled. | A sanitized paid-smoke receipt records `402 → signed 201 → redirect 302 → replay 409`; it remains a bounded testnet observation rather than custody or production-payment assurance. |
 | Telemetry is missing, stale, malformed, or non-finite. | The scorer fails closed rather than interpreting missing data as zero. | A scorer-only unreachable-endpoint test failed closed; it is not a shared-Prometheus outage or full-gate exercise. |
 | The chaos target is absent, an older run remains, or another run owns the Lease. | The orchestrator is designed to stop before fault injection. | The nonexistent-service direct test blocked before fault injection; concurrency behavior remains uncollected. |
 | A workflow times out or cleanup cannot be verified. | The final result is forced to fail when run-scoped resources cannot be confirmed absent. | A one-second direct timeout test invoked cleanup; default-duration timeout behavior remains uncollected. |
 | A candidate is manually patched outside the normal path. | Evidence rules require source, render, image, gate, and runtime identities to agree. | Review discipline still matters; manifests cannot make an undocumented patch auditable. |
-| A required release scenario has not run. | The correct state is unavailable/not collected, not pass. | Dev baseline, deliberately degraded pipeline regression, and production-like smoke remain uncollected. |
+| A required release scenario has not run. | The correct state is unavailable/not collected, not pass. | The final campaign collected baseline, deliberate regression, recovery, and production-like smoke; future candidates must collect fresh records. |
 
 ## Explicit trade-offs
 
@@ -168,15 +166,15 @@ can be reproduced.
   payment flow without making a mainnet, custody, compliance, or production
   availability claim.
 
-## Evidence required before a release claim
+## Evidence required for every release claim
 
-Before the project can claim a verified release, a sanitized evidence record
-must connect the exact source revision, rendered revision, workload digest,
-signer and gate-runner digests where applicable, target context, test window,
-scorecards, and cleanup result. The evidence must come from an explicitly
-approved owned lab. See [evidence handling](evidence/README.md),
+Every verified claim must connect the exact source revision, rendered revision,
+workload digest, signer and gate-runner digests where applicable, target
+context, test window, scorecards, and cleanup result. The evidence must come
+from an explicitly approved owned lab. See [evidence handling](evidence/README.md),
 [artifact identity](design/artifact-identity.md), and
 [the evidence status directories](evidence/).
 
-The current evidence directories contain narrow, linked staging records while
-the remaining release scenarios are explicitly uncollected.
+The final 2 October 2026 campaign satisfied those conditions for its private
+testnet candidate. That result does not carry forward automatically to a later
+candidate.

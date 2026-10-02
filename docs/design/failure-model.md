@@ -1,8 +1,9 @@
 # Promotion failure model and trade-offs
 
-**Status: design contract with scoped supporting evidence.** Named
-staging-testnet records now exercise selected gate paths, but this model is not
-production, mainnet, or release-wide proof.
+**Status: implemented contract with end-to-end owned-testnet evidence.** The
+final campaign exercised positive baseline/chaos/recovery/prod-like paths and
+negative traffic, target, telemetry, load-source, timeout, and historical
+runner-failure paths. It is not mainnet or public-production proof.
 
 ## Claim state is narrower than deployment state
 
@@ -31,7 +32,7 @@ workload cannot represent the normal promotion path.
 | `fail` | A scored condition or verified action did not meet its contract. | No. It can be valuable negative evidence. |
 | `blocked` | A safety precondition was not met: for example, no target, active lock, unavailable load, or unresolved configuration. | No. A block is not a healthy result. |
 | `unavailable` | The scenario was not run because the necessary owned lab or dependency was unavailable. | No. It records absence honestly. |
-| not collected | No run metadata or artifacts exist for that scenario. | No. This remains the status for baseline, pipeline regression, and production-like smoke. |
+| not collected | No run metadata or artifacts exist for that scenario. | No. It remains the required label for any future scenario that has not actually run. |
 
 The shared run-metadata schema has a deliberate, limited scenario vocabulary.
 Subcases such as missing telemetry, no target, load failure, and cleanup
@@ -92,9 +93,11 @@ or post-settlement database failure disappear. A future incident record must
 distinguish those conditions rather than misclassifying them as an application
 or chaos success.
 
-One owned-testnet observation produced `402 → signed 201 → replay 409`, but no
-separately versioned payment-evidence bundle is retained. It therefore does not
-establish settlement finality, custody, or a release claim.
+A sanitized owned-testnet receipt records
+`402 → signed 201 → redirect 302 → replay 409` without wallet, signature,
+payment-header, or transaction identifiers. It establishes the bounded HTTP and
+application replay contract for that run, not settlement finality, custody, or
+general payment-system assurance.
 
 ## Chosen trade-offs
 
@@ -110,10 +113,9 @@ establish settlement finality, custody, or a release claim.
 
 ## Recovery standard
 
-The recorded recovery pair is a same-identity staging re-verification after
-gate-runner correction: it has a linked predecessor and fresh observations, but
-is not a new workload-candidate or release-wide recovery claim. A future
-release recovery must additionally bind an explicit corrective candidate
-revision, new immutable identities where applicable, and a separate complete
-run. Reusing old traffic, scorecards, or cleanup output would hide a change in
-the candidate and is not acceptable evidence.
+The final recovery campaign used a corrective candidate and fresh Kargo-managed
+observations after the deliberately degraded predecessor. It bound the source,
+rendered revision, runtime identities, new AnalysisRun, scorecards, and cleanup.
+Any future recovery must do the same; reusing old traffic, scorecards, or
+cleanup output would hide a change in the candidate and is not acceptable
+evidence.

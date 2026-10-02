@@ -16,21 +16,29 @@ created only after the associated evidence checkpoint is actually verified.
 - Evidence-status templates for baseline, chaos, blocked-path, recovery, and
   production-like smoke scenarios.
 - Architecture, failure-model, limitations, and offline-demo documentation.
+- A completed owned-testnet verification campaign covering dev baseline,
+  staging paid traffic, negative regression gating, corrected chaos/recovery,
+  production-like promotion, cleanup, and evidence hygiene.
+- A canonical documentation index, configuration reference, and final
+  verification report.
 
 ### Verification status
 
 - No released version is declared by this file.
-- Sanitized, schema-validated staging-testnet records now capture one
-  Kargo-managed chaos-gate pass, an earlier failed predecessor, and a fresh
-  successful re-verification. See [evidence handling](docs/evidence/README.md).
-- Four manual direct boundary tests also record fail-closed behavior for no
-  target, unavailable load source, telemetry transport error, and a shortened
-  timeout/cleanup path. They are not Kargo promotions or release approvals.
-- Baseline, deliberately degraded pipeline regression, and production-like
-  smoke evidence remain not collected.
-- No v1.0 tag or evidence-backed release claim should be inferred from the
-  source changes or scoped staging records above.
+- The final source audit recorded 230 project tests and 13 signer tests passing,
+  plus five successful GitHub validation runs.
+- The private lab snapshot recorded two Ready `e2-standard-4` GKE nodes, eight
+  Synced/Healthy Argo CD Applications, and successful latest verification for
+  all three Kargo Stages.
+- Dev baseline, paid staging smoke, deliberately degraded candidate rejection,
+  corrected staging chaos/recovery, and production-like readiness/liveness
+  verification all completed. See the
+  [verification report](docs/verification-report.md).
+- Four direct boundary tests additionally record fail-closed behavior for no
+  target, unavailable load source, telemetry transport error, and shortened
+  timeout/cleanup.
+- No v1.0 tag, mainnet status, or public-production claim is declared. The
+  verified result is scoped to the exact private testnet candidate and snapshot.
 
-When an approved lab run exists, its sanitized evidence must be reviewed and
-linked here with the tested revisions and digest-qualified artifacts before a
-versioned release is announced.
+Future candidate or platform changes must repeat the relevant validation and
+sanitized evidence process before a later versioned release is announced.

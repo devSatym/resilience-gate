@@ -1,15 +1,13 @@
 # Baseline evidence status
 
-**Status: not collected.** No Resilience Gate baseline has been run from this
-workspace against an owned Kubernetes lab, Radius testnet, or production-like
-environment. This directory intentionally contains no `run-metadata.json`,
-load result, Prometheus export, or scorecard. Its presence is not a successful
-baseline claim.
+**Status: passed on 2 October 2026.** Run `baseline-20261002-031523`
+completed against the owned dev namespace. Its detailed sanitized bundle is
+retained outside Git; the reviewed measurements are published in the
+[verification report](../../verification-report.md).
 
-## What a future baseline must bind
+## What the recorded baseline bound
 
-One approved baseline run must use a new, unique run ID and record all of the
-following before it can support a release claim:
+The accepted run used a unique ID and recorded:
 
 - the full source revision, chart/configuration revision, and immutable
   application, signer, and gate-runner image digests actually selected;
@@ -19,15 +17,15 @@ following before it can support a release claim:
 - the exact status returned by the run, plus every redaction category; and
 - a cleanup record if the baseline starts temporary resources.
 
-`run-metadata.json`, when collected, must conform to the shared
+Its `run-metadata.json` conforms to the shared
 [`run-metadata` schema](../../../schemas/run-metadata.schema.json). A
 repository render, unit-test result, or planned configuration is not a
 substitute for any of these artifacts.
 
-## Acceptance rule
+## Accepted result
 
-A baseline may be labelled `pass` only when the recorded release identity is
-complete, the target is demonstrably ready, the bounded traffic window is
-present and interpretable, and no required evidence is absent, stale, or
-redacted beyond review. Until those facts are recorded, the correct status is
-not collected—not healthy.
+The 91-second scorecard observed 44.89 meaningful requests, zero application
+5xx responses, 95 ms p95 latency, and ready PostgreSQL and Redis signals. All
+six checks passed. An earlier failed attempt remains separate and was not
+overwritten. Future candidates return to not-collected status until they run a
+fresh baseline.
