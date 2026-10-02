@@ -82,6 +82,7 @@ def fake_environment(
     fail_gate_exec: bool = False,
     log_scorecards: tuple[str, ...] | None = None,
     include_kargo: bool = True,
+    freight_verified_in_staging: bool = True,
 ) -> tuple[dict[str, str], Path, Path]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -140,6 +141,10 @@ if [[ "$args" == *"get analysistemplate service-health -o yaml"* ]]; then
   printf 'apiVersion: argoproj.io/v1alpha1\\nkind: AnalysisTemplate\\nmetadata:\\n  name: service-health\\n'
   exit 0
 fi
+if [[ "$args" == *"get analysistemplate prod-post-deploy-health -o yaml"* ]]; then
+  printf 'apiVersion: argoproj.io/v1alpha1\\nkind: AnalysisTemplate\\nmetadata:\\n  name: prod-post-deploy-health\\n'
+  exit 0
+fi
 if [[ "$args" == *"get deployment url-shortener-staging -o yaml"* ]]; then
   printf 'apiVersion: apps/v1\\nkind: Deployment\\nmetadata:\\n  name: url-shortener-staging\\n'
   exit 0
@@ -188,6 +193,11 @@ if [[ "$args" == *"get stage prod"* ]]; then exit 0; fi
 if [[ "$args" == *"annotate stage.kargo.akuity.io/"* ]]; then exit 0; fi
 if [[ "$args" == *"get analysistemplate chaos-gate"* ]]; then exit 0; fi
 if [[ "$args" == *"get analysistemplate service-health"* ]]; then exit 0; fi
+if [[ "$args" == *"get analysistemplate prod-post-deploy-health"* ]]; then exit 0; fi
+if [[ "$args" == *"get freight candidate-1 -o jsonpath="* ]]; then
+  if [[ "$FREIGHT_VERIFIED_IN_STAGING" == "1" ]]; then printf '2026-10-01T12:00:00Z'; fi
+  exit 0
+fi
 if [[ "$args" == *"get freight candidate-1"* ]]; then exit 0; fi
 exit 1
 """,
@@ -203,6 +213,7 @@ exit 0
     env = os.environ | {
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "FAIL_GATE_EXEC": "1" if fail_gate_exec else "0",
+        "FREIGHT_VERIFIED_IN_STAGING": "1" if freight_verified_in_staging else "0",
     }
     return env, calls, write_config(tmp_path)
 
@@ -317,6 +328,59 @@ def test_named_staging_promotion_needs_a_second_acknowledgement(tmp_path: Path) 
     assert "kargo promote --project resilience-gate --freight candidate-1 --stage staging" in calls.read_text(
         encoding="utf-8"
     )
+
+
+def test_named_prod_promotion_requires_a_distinct_acknowledgement(tmp_path: Path) -> None:
+    env, calls, config = fake_environment(tmp_path)
+    command = [
+        "bash",
+        str(LIVE_RUNNER),
+        "--execute",
+        "--acknowledge-owned-testnet-lab",
+        "--scenario",
+        "prod-smoke",
+        "--promotion-freight",
+        "candidate-1",
+        "--config",
+        str(config),
+    ]
+
+    denied = run(command, env=env)
+    assert denied.returncode == 2
+    assert "acknowledge-prod-promotion" in denied.stderr
+    assert not calls.exists()
+
+    accepted = run(command + ["--acknowledge-prod-promotion"], env=env)
+    assert accepted.returncode == 0, accepted.stderr
+    assert "kargo promote --project resilience-gate --freight candidate-1 --stage prod" in calls.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_named_prod_promotion_rejects_freight_without_staging_verification(tmp_path: Path) -> None:
+    env, calls, config = fake_environment(tmp_path, freight_verified_in_staging=False)
+    result = run(
+        [
+            "bash",
+            str(LIVE_RUNNER),
+            "--execute",
+            "--acknowledge-owned-testnet-lab",
+            "--acknowledge-prod-promotion",
+            "--scenario",
+            "prod-smoke",
+            "--promotion-freight",
+            "candidate-1",
+            "--config",
+            str(config),
+        ],
+        env=env,
+    )
+
+    assert result.returncode == 2
+    assert "has not been verified in Stage/staging" in result.stderr
+    recorded = calls.read_text(encoding="utf-8")
+    assert "get freight candidate-1 -o jsonpath=" in recorded
+    assert "kargo promote" not in recorded
 
 
 def test_collector_writes_sanitized_bundle_and_release_metadata(tmp_path: Path) -> None:

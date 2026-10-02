@@ -20,7 +20,8 @@ scenario=""
 promotion_freight=""
 config_file="${CONFIG_FILE:-$PLATFORM_DIR/config.env}"
 acknowledged_lab=false
-acknowledged_promotion=false
+acknowledged_staging_promotion=false
+acknowledged_prod_promotion=false
 
 usage() {
   cat <<'USAGE'
@@ -28,7 +29,7 @@ Usage:
   ./scripts/validate-live.sh --plan --scenario SCENARIO [--promotion-freight NAME]
   ./scripts/validate-live.sh --execute --acknowledge-owned-testnet-lab \
     --scenario SCENARIO --config PATH [--promotion-freight NAME \
-    --acknowledge-staging-promotion]
+    [--acknowledge-staging-promotion|--acknowledge-prod-promotion]]
 
 Scenarios:
   baseline            Reverify development's normal service-health contract.
@@ -44,11 +45,13 @@ Options:
   --plan                        Print the intended Kargo action (default).
   --execute                     Request the action after all safety checks.
   --scenario NAME               One scenario from the list above (required).
-  --promotion-freight NAME      Kargo Freight name for a staging promotion.
+  --promotion-freight NAME      Kargo Freight name for a named promotion.
   --acknowledge-owned-testnet-lab
                                 Required for every --execute request.
   --acknowledge-staging-promotion
-                                Also required when --promotion-freight is used.
+                                Required for a named staging promotion.
+  --acknowledge-prod-promotion
+                                Required for a named production-like promotion.
   --config PATH                 Ignored local platform configuration for the
                                 exact expected Kubernetes context.
   -h, --help                    Show this help.
@@ -98,7 +101,11 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --acknowledge-staging-promotion)
-      acknowledged_promotion=true
+      acknowledged_staging_promotion=true
+      shift
+      ;;
+    --acknowledge-prod-promotion)
+      acknowledged_prod_promotion=true
       shift
       ;;
     -h|--help)
@@ -121,8 +128,8 @@ if [[ -n "$promotion_freight" ]]; then
   [[ "$promotion_freight" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
     && (( ${#promotion_freight} <= 63 )) \
     || die "--promotion-freight must be a lowercase DNS label of at most 63 characters"
-  [[ "$scenario" == "chaos-gate" || "$scenario" == "regression-blocked" || "$scenario" == "recovery" ]] \
-    || die "--promotion-freight is valid only for staging gate scenarios"
+  [[ "$scenario" == "chaos-gate" || "$scenario" == "regression-blocked" || "$scenario" == "recovery" || "$scenario" == "prod-smoke" ]] \
+    || die "--promotion-freight is valid only for staging gate or prod-smoke scenarios"
 fi
 
 if [[ "$scenario" == "regression-blocked" && -z "$promotion_freight" ]]; then
@@ -179,7 +186,7 @@ if [[ "$mode" == "plan" ]]; then
   printf '  Stage: %s\n' "$stage"
   printf '  target namespace: %s\n' "$target_namespace"
   if [[ -n "$promotion_freight" ]]; then
-    printf '  Freight: %s (a real staging promotion would be requested)\n' "$promotion_freight"
+    printf '  Freight: %s (a real %s promotion would be requested)\n' "$promotion_freight" "$stage"
   else
     printf "%s\n" "  Action: reverify the Stage's current Freight"
   fi
@@ -199,8 +206,13 @@ fi
 [[ "$acknowledged_lab" == true ]] \
   || die "--execute requires --acknowledge-owned-testnet-lab"
 if [[ -n "$promotion_freight" ]]; then
-  [[ "$acknowledged_promotion" == true ]] \
-    || die "a staging promotion also requires --acknowledge-staging-promotion"
+  if [[ "$scenario" == "prod-smoke" ]]; then
+    [[ "$acknowledged_prod_promotion" == true ]] \
+      || die "a production-like promotion also requires --acknowledge-prod-promotion"
+  else
+    [[ "$acknowledged_staging_promotion" == true ]] \
+      || die "a staging promotion also requires --acknowledge-staging-promotion"
+  fi
 fi
 [[ -f "$config_file" ]] || die "configuration file not found: $config_file"
 
@@ -228,6 +240,12 @@ done < <(analysis_templates_for_scenario "$scenario")
 if [[ -n "$promotion_freight" ]]; then
   kubectl -n "$KARGO_PROJECT" get freight "$promotion_freight" >/dev/null \
     || die "Freight/$promotion_freight is not present in project $KARGO_PROJECT"
+  if [[ "$scenario" == "prod-smoke" ]]; then
+    verified_in_staging="$(kubectl -n "$KARGO_PROJECT" get freight "$promotion_freight" \
+      -o jsonpath='{.status.verifiedIn.staging.verifiedAt}')"
+    [[ -n "$verified_in_staging" ]] \
+      || die "Freight/$promotion_freight has not been verified in Stage/staging"
+  fi
 fi
 
 if [[ -z "$promotion_freight" ]] && ! command -v kargo >/dev/null 2>&1; then
