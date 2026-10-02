@@ -20,9 +20,7 @@ app:
 payments:
   enabled: true
   testnetOnly: true
-  # Temporary pipeline-regression candidate: the reserved .invalid endpoint
-  # preserves the testnet-only shape while making signed settlement fail closed.
-  facilitatorUrl: "https://facilitator.testnet.invalid"
+  facilitatorUrl: "https://facilitator.testnet.radiustech.xyz"
   network: "eip155:72344"
   timeoutSeconds: "10"
 
