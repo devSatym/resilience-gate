@@ -262,6 +262,9 @@ add_redactions() {
   while IFS= read -r category; do
     [[ -n "$category" && "$category" != "none" ]] && redaction_categories+=("$category")
   done < "$report"
+  # A report containing only `none` is normal. Do not let the final false
+  # predicate become this helper's return status under `set -e`.
+  return 0
 }
 
 capture_command() {

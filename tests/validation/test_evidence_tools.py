@@ -566,6 +566,8 @@ def test_scorecard_extractor_accepts_prefixed_logs_and_rejects_ambiguous_matches
 def test_collector_maps_baseline_evidence_to_development_without_gate_artifacts(tmp_path: Path) -> None:
     env, calls, config = fake_environment(tmp_path)
     output_root = tmp_path / "evidence-output"
+    supplemental_source = tmp_path / "baseline-result.json"
+    supplemental_source.write_text('{"status":"collected"}\n', encoding="utf-8")
     result = run(
         [
             "bash",
@@ -582,6 +584,8 @@ def test_collector_maps_baseline_evidence_to_development_without_gate_artifacts(
             "blocked",
             "--run-id",
             "baseline-evidence-1",
+            "--include",
+            str(supplemental_source),
         ],
         env=env,
     )
@@ -591,6 +595,7 @@ def test_collector_maps_baseline_evidence_to_development_without_gate_artifacts(
         (output_root / "baseline" / "baseline-evidence-1" / "run-metadata.json").read_text(encoding="utf-8")
     )
     assert metadata["namespace"] == "url-shortener-dev"
+    assert (output_root / "baseline" / "baseline-evidence-1" / "supplemental" / "baseline-result.json").is_file()
     assert "kubectl -n resilience-gate get stage dev -o yaml" in calls.read_text(encoding="utf-8")
     assert "url-shortener-staging" not in calls.read_text(encoding="utf-8")
 
