@@ -345,24 +345,26 @@ if [[ -n "$gate_pod" ]]; then
   gate_log_path="$temporary_directory/gate/pod-${gate_pod}.log"
   required_capture "logs for Pod/$gate_pod" "gate/pod-${gate_pod}.log" \
     kubectl -n "$KARGO_PROJECT" logs "pod/$gate_pod" --all-containers=true --prefix=true --tail=500
-  for scorecard in postgres-pod-failure redis-pod-failure signer-pod-failure; do
-    scorecard_path="scorecards/${scorecard}.json"
-    if capture_command "$scorecard_path" \
-      kubectl -n "$KARGO_PROJECT" exec "$gate_pod" -c chaos-gate -- \
-        cat "/results/${scorecard}.json"; then
-      continue
-    fi
+  if [[ "$status" == "pass" ]]; then
+    for scorecard in postgres-pod-failure redis-pod-failure signer-pod-failure; do
+      scorecard_path="scorecards/${scorecard}.json"
+      if capture_command "$scorecard_path" \
+        kubectl -n "$KARGO_PROJECT" exec "$gate_pod" -c chaos-gate -- \
+          cat "/results/${scorecard}.json"; then
+        continue
+      fi
 
-    # A completed Job cannot serve kubectl exec, but score_experiment.py emits
-    # each scorecard to the retained container log.  The log above has already
-    # passed through the sanitizer, so this fallback never writes raw output.
-    python3 "$EVIDENCE_UTILITY" extract-scorecard \
-      --input "$gate_log_path" \
-      --experiment "$scorecard" \
-      --output "$temporary_directory/$scorecard_path" \
-      || die "could not recover scorecard $scorecard from sanitized gate logs"
-    evidence_files+=("$scorecard_path")
-  done
+      # A completed Job cannot serve kubectl exec, but score_experiment.py emits
+      # each scorecard to the retained container log.  The log above has already
+      # passed through the sanitizer, so this fallback never writes raw output.
+      python3 "$EVIDENCE_UTILITY" extract-scorecard \
+        --input "$gate_log_path" \
+        --experiment "$scorecard" \
+        --output "$temporary_directory/$scorecard_path" \
+        || die "could not recover scorecard $scorecard from sanitized gate logs"
+      evidence_files+=("$scorecard_path")
+    done
+  fi
 fi
 
 declare -A supplemental_names=()

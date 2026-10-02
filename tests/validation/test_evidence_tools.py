@@ -408,6 +408,44 @@ def test_collector_recovers_completed_gate_scorecards_from_sanitized_logs(tmp_pa
     assert "kubectl -n resilience-gate logs pod/gate-pod-1 --all-containers=true --prefix=true" in recorded
 
 
+def test_collector_captures_a_failed_gate_without_unavailable_scorecards(tmp_path: Path) -> None:
+    env, calls, config = fake_environment(
+        tmp_path,
+        fail_gate_exec=True,
+        log_scorecards=(),
+    )
+    output_root = tmp_path / "evidence-output"
+    result = run(
+        [
+            "bash",
+            str(COLLECTOR),
+            "--collect",
+            "--acknowledge-owned-testnet-lab",
+            "--config",
+            str(config),
+            "--output-root",
+            str(output_root),
+            "--scenario",
+            "chaos-gate",
+            "--status",
+            "fail",
+            "--run-id",
+            "failed-gate-evidence-1",
+            "--gate-job",
+            "gate-job-1",
+        ],
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    bundle = output_root / "chaos-gate" / "failed-gate-evidence-1"
+    assert (bundle / "gate" / "job-gate-job-1.yaml").is_file()
+    assert (bundle / "gate" / "pod-gate-pod-1.log").is_file()
+    assert not (bundle / "scorecards").exists()
+    recorded = calls.read_text(encoding="utf-8")
+    assert "kubectl -n resilience-gate exec gate-pod-1" not in recorded
+
+
 def test_collector_refuses_missing_completed_gate_scorecard(tmp_path: Path) -> None:
     env, _calls, config = fake_environment(
         tmp_path,
