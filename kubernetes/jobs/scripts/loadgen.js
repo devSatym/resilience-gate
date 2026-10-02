@@ -20,6 +20,9 @@ const redirectOkRate = new Rate('redirect_ok_rate');
 const independentRedirectOkRate = new Rate('independent_redirect_ok_rate');
 const endToEndSuccessRate = new Rate('end_to_end_success_rate');
 const endToEndDuration = new Trend('end_to_end_duration_ms', true);
+const baselineGetSuccessRate = new Rate('baseline_get_success_rate');
+const baseline5xxRate = new Rate('baseline_5xx_rate');
+const baselineGetDuration = new Trend('baseline_get_duration_ms', true);
 
 function environment(name, fallback = '') {
   return String(__ENV[name] === undefined ? fallback : __ENV[name]).trim();
@@ -71,6 +74,7 @@ function normaliseHttpUrl(name, value) {
 }
 
 const BASE_URL = environment('BASE_URL');
+const TRAFFIC_MODE = environment('TRAFFIC_MODE', 'paid');
 const SIGNER_URL = environment('SIGNER_URL');
 const NETWORK_CAIP2 = environment('NETWORK_CAIP2', TESTNET_NETWORK);
 const SERVICE_WALLET = environment('SERVICE_WALLET_ADDRESS');
@@ -93,67 +97,115 @@ const PAYMENT_BUFFER = positiveInteger(
   1000,
 );
 const REDIRECT_PROBE_URL = environment('REDIRECT_PROBE_URL');
+const DEV_BASELINE_URL = 'http://url-shortener-dev.url-shortener-dev.svc.cluster.local';
+const MAX_BASELINE_DURATION_MS = 90 * 1000;
 
-const thresholds = {
-  'http_req_duration{endpoint:sign}': ['p(95)<100'],
-  'http_req_duration{endpoint:shorten}': ['p(95)<1000'],
-  'http_req_duration{endpoint:redirect}': ['p(95)<100'],
-  http_req_failed: ['rate<0.05'],
-  end_to_end_success_rate: ['rate>0.90'],
-  shorten_201_rate: ['rate>0.90'],
-  redirect_ok_rate: ['rate>0.95'],
-};
+let scenarios;
+let thresholds;
 
-if (PAYMENT_ENABLED) {
-  thresholds.sign_success_rate = ['rate>0.99'];
-  thresholds.payment_settled_rate = ['rate>0.95'];
-}
-if (REDIRECT_PROBE_URL) {
-  thresholds.independent_redirect_ok_rate = ['rate>0.95'];
-}
-
-const paymentScenario = LOAD_PROFILE === 'arrival-rate'
-  ? {
+if (TRAFFIC_MODE === 'unpaid-baseline') {
+  scenarios = {
+    unpaid_baseline: {
       executor: 'constant-arrival-rate',
-      exec: 'paymentFlow',
+      exec: 'baselineFlow',
       rate: ARRIVAL_RATE,
       timeUnit: ARRIVAL_TIME_UNIT,
       duration: DURATION,
       preAllocatedVUs: VUS,
-      // Each payment VU has one signer wallet. The profile is bounded rather
-      // than spilling into unreviewed additional wallet/key slots.
       maxVUs: VUS,
       gracefulStop: '15s',
-    }
-  : {
+    },
+  };
+  thresholds = {
+    'http_req_duration{endpoint:baseline-index}': ['p(95)<1000'],
+    http_req_failed: ['rate<0.05'],
+    baseline_get_success_rate: ['rate>0.95'],
+    baseline_5xx_rate: ['rate<0.01'],
+  };
+} else {
+  thresholds = {
+    'http_req_duration{endpoint:sign}': ['p(95)<100'],
+    'http_req_duration{endpoint:shorten}': ['p(95)<1000'],
+    'http_req_duration{endpoint:redirect}': ['p(95)<100'],
+    http_req_failed: ['rate<0.05'],
+    end_to_end_success_rate: ['rate>0.90'],
+    shorten_201_rate: ['rate>0.90'],
+    redirect_ok_rate: ['rate>0.95'],
+  };
+
+  if (PAYMENT_ENABLED) {
+    thresholds.sign_success_rate = ['rate>0.99'];
+    thresholds.payment_settled_rate = ['rate>0.95'];
+  }
+  if (REDIRECT_PROBE_URL) {
+    thresholds.independent_redirect_ok_rate = ['rate>0.95'];
+  }
+
+  const paymentScenario = LOAD_PROFILE === 'arrival-rate'
+    ? {
+        executor: 'constant-arrival-rate',
+        exec: 'paymentFlow',
+        rate: ARRIVAL_RATE,
+        timeUnit: ARRIVAL_TIME_UNIT,
+        duration: DURATION,
+        preAllocatedVUs: VUS,
+        // Each payment VU has one signer wallet. The profile is bounded rather
+        // than spilling into unreviewed additional wallet/key slots.
+        maxVUs: VUS,
+        gracefulStop: '15s',
+      }
+    : {
+        executor: 'constant-vus',
+        exec: 'paymentFlow',
+        vus: VUS,
+        duration: DURATION,
+        gracefulStop: '15s',
+      };
+
+  scenarios = { payment_flow: paymentScenario };
+  if (REDIRECT_PROBE_URL) {
+    scenarios.independent_redirects = {
       executor: 'constant-vus',
-      exec: 'paymentFlow',
-      vus: VUS,
+      exec: 'independentRedirectProbe',
+      vus: 1,
       duration: DURATION,
       gracefulStop: '15s',
     };
-
-const scenarios = { payment_flow: paymentScenario };
-if (REDIRECT_PROBE_URL) {
-  scenarios.independent_redirects = {
-    executor: 'constant-vus',
-    exec: 'independentRedirectProbe',
-    vus: 1,
-    duration: DURATION,
-    gracefulStop: '15s',
-  };
+  }
 }
 
 export const options = { scenarios, thresholds };
 
 function validateConfiguration() {
-  normaliseHttpUrl('BASE_URL', BASE_URL);
-  parseDurationMs('DURATION', DURATION, MAX_RUN_DURATION_MS);
+  const normalisedBaseUrl = normaliseHttpUrl('BASE_URL', BASE_URL);
+  const maxDuration = TRAFFIC_MODE === 'unpaid-baseline'
+    ? MAX_BASELINE_DURATION_MS
+    : MAX_RUN_DURATION_MS;
+  parseDurationMs('DURATION', DURATION, maxDuration);
   parseDurationMs('PRECHECK_TIMEOUT', PRECHECK_TIMEOUT, 30000);
   parseDurationMs('ARRIVAL_TIME_UNIT', ARRIVAL_TIME_UNIT, 3600000);
 
+  if (TRAFFIC_MODE !== 'paid' && TRAFFIC_MODE !== 'unpaid-baseline') {
+    fail('TRAFFIC_MODE must be paid or unpaid-baseline');
+  }
   if (LOAD_PROFILE !== 'closed-loop' && LOAD_PROFILE !== 'arrival-rate') {
     fail('LOAD_PROFILE must be closed-loop or arrival-rate');
+  }
+  if (TRAFFIC_MODE === 'unpaid-baseline') {
+    if (PAYMENT_ENABLED) fail('PAYMENT_ENABLED must be false for unpaid-baseline traffic');
+    if (normalisedBaseUrl !== DEV_BASELINE_URL) {
+      fail(`BASE_URL must be ${DEV_BASELINE_URL} for unpaid-baseline traffic`);
+    }
+    if (LOAD_PROFILE !== 'arrival-rate') {
+      fail('unpaid-baseline traffic requires LOAD_PROFILE=arrival-rate');
+    }
+    if (VUS !== 1) fail('unpaid-baseline traffic requires VUS=1');
+    if (ARRIVAL_TIME_UNIT !== '1m') {
+      fail('unpaid-baseline traffic requires ARRIVAL_TIME_UNIT=1m');
+    }
+    if (ARRIVAL_RATE > 60) fail('unpaid-baseline traffic allows at most 60 requests per minute');
+    if (REDIRECT_PROBE_URL) fail('REDIRECT_PROBE_URL is not valid for unpaid-baseline traffic');
+    return;
   }
   if (NETWORK_CAIP2 !== TESTNET_NETWORK) {
     fail(`NETWORK_CAIP2 must remain the owned testnet (${TESTNET_NETWORK})`);
@@ -204,6 +256,7 @@ export function setup() {
   validateConfiguration();
 
   const appUrl = normaliseHttpUrl('BASE_URL', BASE_URL);
+  if (TRAFFIC_MODE === 'unpaid-baseline') return;
   requireStatus(
     http.get(`${appUrl}/livez`, { timeout: PRECHECK_TIMEOUT }),
     200,
@@ -280,6 +333,20 @@ export function setup() {
       fail(`Signer wallet ${wallet.wallet_index} has insufficient SBC for this bounded run`);
     }
   }
+}
+
+export function baselineFlow() {
+  const started = Date.now();
+  const appUrl = normaliseHttpUrl('BASE_URL', BASE_URL);
+  const response = http.get(`${appUrl}/`, {
+    tags: { endpoint: 'baseline-index' },
+    timeout: PRECHECK_TIMEOUT,
+  });
+  const succeeded = response.status === 200;
+  check(response, { 'baseline GET / returns 200': (result) => result.status === 200 });
+  baselineGetSuccessRate.add(succeeded);
+  baseline5xxRate.add(response.status >= 500 && response.status < 600);
+  baselineGetDuration.add(Date.now() - started);
 }
 
 function buildPaymentSignatureHeader(signerResponse) {
@@ -414,5 +481,9 @@ export function independentRedirectProbe() {
 // Preserve the ordinary k6 entrypoint for local reviewers while the CronJob
 // uses the named paymentFlow scenario above.
 export default function () {
+  if (TRAFFIC_MODE === 'unpaid-baseline') {
+    baselineFlow();
+    return;
+  }
   paymentFlow();
 }
