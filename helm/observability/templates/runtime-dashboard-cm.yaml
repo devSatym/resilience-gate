@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: resilience-runtime-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+data:
+  resilience-runtime.json: |
+    {
+      "uid": "resilience-gate-runtime",
+      "title": "Resilience Gate — Kubernetes runtime",
+      "description": "Replica readiness, pod recovery, restarts, resource use, and scrape health.",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "time": {"from": "now-30m", "to": "now"},
+      "timezone": "utc",
+      "tags": ["resilience-gate", "runtime"],
+      "links": [{
+        "asDropdown": true,
+        "icon": "dashboard",
+        "includeVars": true,
+        "keepTime": true,
+        "tags": ["resilience-gate"],
+        "targetBlank": false,
+        "title": "Resilience Gate dashboards",
+        "type": "dashboards"
+      }],
+      "templating": {
+        "list": [{
+          "name": "namespace",
+          "label": "Environment",
+          "type": "custom",
+          "query": "url-shortener-dev,url-shortener-staging,url-shortener-prod",
+          "current": {"text": "url-shortener-staging", "value": "url-shortener-staging"},
+          "options": [
+            {"text": "url-shortener-dev", "value": "url-shortener-dev"},
+            {"text": "url-shortener-staging", "value": "url-shortener-staging"},
+            {"text": "url-shortener-prod", "value": "url-shortener-prod"}
+          ]
+        }]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Deployment replicas: desired vs ready",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "kube_deployment_spec_replicas{namespace=\"$namespace\",deployment=~\"url-shortener-.*|radius-signer\"}",
+              "legendFormat": "{{ "{{deployment}} desired" }}"
+            },
+            {
+              "refId": "B",
+              "expr": "kube_deployment_status_replicas_ready{namespace=\"$namespace\",deployment=~\"url-shortener-.*|radius-signer\"}",
+              "legendFormat": "{{ "{{deployment}} ready" }}"
+            }
+          ],
+          "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0}}
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Critical pod readiness",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "targets": [{
+            "refId": "A",
+            "expr": "min by (pod) (kube_pod_status_ready{namespace=\"$namespace\",condition=\"true\",pod=~\"$namespace-(postgresql-0|redis-master-0)|radius-signer-.*\"})",
+            "legendFormat": "{{ "{{pod}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"min": 0, "max": 1, "decimals": 0}}
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Container restarts in selected range",
+          "description": "A zero value proves the application and signer did not restart during the selected interval.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 8, "w": 8, "h": 6},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\",container=~\"url-shortener|radius-signer\"}[$__range])) or vector(0)"
+          }],
+          "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"}
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Prometheus scrape targets up",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 8, "y": 8, "w": 8, "h": 6},
+          "targets": [{
+            "refId": "A",
+            "expr": "min(up{namespace=\"$namespace\",job=~\"url-shortener|radius-signer\"}) or vector(0)"
+          }],
+          "fieldConfig": {"defaults": {"min": 0, "max": 1, "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"}
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Ready application replicas",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 16, "y": 8, "w": 8, "h": 6},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(kube_deployment_status_replicas_ready{namespace=\"$namespace\",deployment=~\"url-shortener-.*\"}) or vector(0)"
+          }],
+          "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 2}]}}},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"}
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Application and signer CPU",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 14, "w": 12, "h": 8},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",container=~\"url-shortener|radius-signer\"}[1m]))",
+            "legendFormat": "{{ "{{container}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"unit": "cores", "min": 0}}
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Application and signer memory",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 14, "w": 12, "h": 8},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum by (container) (container_memory_working_set_bytes{namespace=\"$namespace\",container=~\"url-shortener|radius-signer\"})",
+            "legendFormat": "{{ "{{container}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"unit": "bytes", "min": 0}}
+        }
+      ]
+    }

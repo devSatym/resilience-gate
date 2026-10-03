@@ -9,12 +9,24 @@ data:
   url-shortener.json: |
     {
       "uid": "resilience-gate-app",
-      "title": "Resilience Gate — application and payment health",
+      "title": "Resilience Gate — application health",
+      "description": "HTTP service health, latency, dependencies, and cache behavior.",
       "schemaVersion": 39,
-      "version": 1,
+      "version": 2,
       "refresh": "10s",
       "time": {"from": "now-15m", "to": "now"},
-      "tags": ["resilience-gate", "payments"],
+      "timezone": "utc",
+      "tags": ["resilience-gate", "application"],
+      "links": [{
+        "asDropdown": true,
+        "icon": "dashboard",
+        "includeVars": true,
+        "keepTime": true,
+        "tags": ["resilience-gate"],
+        "targetBlank": false,
+        "title": "Resilience Gate dashboards",
+        "type": "dashboards"
+      }],
       "templating": {
         "list": [
           {
@@ -35,78 +47,100 @@ data:
         {
           "id": 1,
           "type": "timeseries",
-          "title": "HTTP request rate by handler",
+          "title": "HTTP request rate by route and status",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
           "targets": [{
             "refId": "A",
-            "expr": "sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\"}[1m])) by (handler,method)",
-            "legendFormat": "{{ "{{handler}} {{method}}" }}"
+            "expr": "sum by (handler,status) (rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\"}[1m]))",
+            "legendFormat": "{{ "{{handler}} {{status}}" }}"
           }],
           "fieldConfig": {"defaults": {"unit": "reqps"}}
         },
         {
           "id": 2,
           "type": "timeseries",
-          "title": "p95 request duration",
+          "title": "Request latency by route",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
-          "targets": [{
-            "refId": "A",
-            "expr": "histogram_quantile(0.95,sum(rate(http_request_duration_seconds_bucket{job=\"url-shortener\",namespace=\"$namespace\"}[5m])) by (le,handler))*1000",
-            "legendFormat": "{{ "{{handler}}" }}"
-          }],
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.50,sum by (le,handler) (rate(http_request_duration_seconds_bucket{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\"}[5m])))*1000",
+              "legendFormat": "{{ "{{handler}} p50" }}"
+            },
+            {
+              "refId": "B",
+              "expr": "histogram_quantile(0.95,sum by (le,handler) (rate(http_request_duration_seconds_bucket{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\"}[5m])))*1000",
+              "legendFormat": "{{ "{{handler}} p95" }}"
+            }
+          ],
           "fieldConfig": {"defaults": {"unit": "ms"}}
         },
         {
           "id": 3,
           "type": "stat",
-          "title": "Paid shorten success rate (5m)",
-          "description": "201 responses divided by all POST /shorten responses. No traffic is displayed as 0 rather than a fabricated success.",
+          "title": "Requests in selected range",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 0, "y": 8, "w": 6, "h": 5},
           "targets": [{
             "refId": "A",
-            "expr": "sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler=\"/shorten\",method=\"POST\",status=\"201\"}[5m])) / clamp_min(sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler=\"/shorten\",method=\"POST\"}[5m])),1)"
+            "expr": "sum(increase(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\"}[$__range])) or vector(0)"
           }],
-          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.9}, {"color": "green", "value": 0.95}]}}},
-          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"}
+          "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area"}
         },
         {
           "id": 4,
           "type": "stat",
-          "title": "Payment replay attempts",
-          "description": "Application-level UNIQUE constraint failures for settlement transaction hashes.",
+          "title": "5xx share (5m)",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 6, "y": 8, "w": 6, "h": 5},
-          "targets": [{"refId": "A", "expr": "sum(payment_replay_attempts_total{job=\"url-shortener\",namespace=\"$namespace\"}) or vector(0)"}],
-          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+          "targets": [{
+            "refId": "A",
+            "expr": "100 * sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\"}[5m])),0.000001)"
+          }],
+          "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]}}},
           "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"}
         },
         {
           "id": 5,
           "type": "timeseries",
-          "title": "Payment outcomes and facilitator latency",
+          "title": "Dependency availability",
+          "description": "Minimum reported state across application replicas; 1 is reachable and 0 is unavailable.",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 12, "y": 8, "w": 12, "h": 5},
-          "targets": [
-            {"refId": "A", "expr": "sum(rate(payment_402_responses_total{job=\"url-shortener\",namespace=\"$namespace\"}[5m]))", "legendFormat": "402/s"},
-            {"refId": "B", "expr": "histogram_quantile(0.95,sum(rate(payment_facilitator_duration_seconds_bucket{job=\"url-shortener\",namespace=\"$namespace\"}[5m])) by (le))*1000", "legendFormat": "facilitator p95"}
-          ],
-          "fieldConfig": {"defaults": {"unit": "ms"}}
+          "targets": [{
+            "refId": "A",
+            "expr": "min by (dependency) (url_shortener_dependency_up{job=\"url-shortener\",namespace=\"$namespace\"})",
+            "legendFormat": "{{ "{{dependency}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"min": 0, "max": 1, "decimals": 0}}
         },
         {
           "id": 6,
           "type": "timeseries",
-          "title": "Dependency availability",
+          "title": "Redis cache activity",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"x": 0, "y": 13, "w": 24, "h": 7},
+          "gridPos": {"x": 0, "y": 13, "w": 12, "h": 7},
+          "targets": [
+            {"refId": "A", "expr": "sum(rate(url_shortener_cache_hits_total{job=\"url-shortener\",namespace=\"$namespace\"}[1m]))", "legendFormat": "hits/s"},
+            {"refId": "B", "expr": "sum(rate(url_shortener_cache_misses_total{job=\"url-shortener\",namespace=\"$namespace\"}[1m]))", "legendFormat": "misses or fallbacks/s"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "ops"}}
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Short URLs created",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 13, "w": 12, "h": 7},
           "targets": [{
             "refId": "A",
-            "expr": "url_shortener_dependency_up{job=\"url-shortener\",namespace=\"$namespace\"}",
-            "legendFormat": "{{ "{{dependency}}" }}"
+            "expr": "sum(rate(url_shortener_urls_created_total{job=\"url-shortener\",namespace=\"$namespace\"}[1m]))",
+            "legendFormat": "created/s"
           }],
-          "fieldConfig": {"defaults": {"min": 0, "max": 1}}
+          "fieldConfig": {"defaults": {"unit": "ops"}}
         }
       ]
     }

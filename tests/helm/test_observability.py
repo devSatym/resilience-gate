@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import subprocess
 
 import yaml
@@ -29,10 +30,17 @@ def dashboard_json(path: Path, key: str) -> dict:
     payload = "\n".join(line[4:] for line in block.splitlines() if line.startswith("    "))
     # Helm emits these Grafana legend placeholders verbatim; normalize them
     # only for JSON syntax validation in this source-level test.
-    payload = payload.replace('{{ "{{handler}} {{method}}" }}', "{{handler}} {{method}}")
-    payload = payload.replace('{{ "{{handler}}" }}', "{{handler}}")
-    payload = payload.replace('{{ "{{dependency}}" }}', "{{dependency}}")
+    payload = re.sub(r'\{\{ "([^"]+)" \}\}', lambda match: match.group(1), payload)
     return json.loads(payload)
+
+
+def panel_expressions(dashboard: dict) -> list[str]:
+    return [
+        target["expr"]
+        for panel in dashboard["panels"]
+        for target in panel.get("targets", [])
+        if "expr" in target
+    ]
 
 
 def test_chart_lock_pins_supported_telemetry_components() -> None:
@@ -102,9 +110,10 @@ def test_gke_coredns_monitor_targets_the_managed_metrics_port() -> None:
 
 
 def test_service_monitors_and_dashboards_cover_the_application_contract() -> None:
+    documents = render_chart()
     monitors = [
         document
-        for document in render_chart()
+        for document in documents
         if document["kind"] == "ServiceMonitor"
         and document["metadata"]["name"].startswith("url-shortener-")
     ]
@@ -121,13 +130,72 @@ def test_service_monitors_and_dashboards_cover_the_application_contract() -> Non
         assert "sampleLimit" not in spec["endpoints"][0]
         assert "labelLimit" not in spec["endpoints"][0]
 
-    application = dashboard_json(CHART / "templates" / "dashboard-cm.yaml", "url-shortener.json")
-    chaos = dashboard_json(CHART / "templates" / "chaos-demo-dashboard-cm.yaml", "chaos-demo.json")
-    application_queries = json.dumps(application)
-    chaos_queries = json.dumps(chaos)
-    assert "payment_replay_attempts_total" in application_queries
-    assert "payment_facilitator_duration_seconds_bucket" in application_queries
-    assert "|!=" in chaos_queries
+    application = dashboard_json(
+        CHART / "templates" / "dashboard-cm.yaml", "url-shortener.json"
+    )
+    chaos = dashboard_json(
+        CHART / "templates" / "chaos-demo-dashboard-cm.yaml", "chaos-demo.json"
+    )
+    runtime = dashboard_json(
+        CHART / "templates" / "runtime-dashboard-cm.yaml",
+        "resilience-runtime.json",
+    )
+    payments = dashboard_json(
+        CHART / "templates" / "payment-dashboard-cm.yaml",
+        "resilience-payment.json",
+    )
+
+    dashboards = (application, chaos, runtime, payments)
+    assert {dashboard["uid"] for dashboard in dashboards} == {
+        "resilience-gate-app",
+        "resilience-gate-chaos",
+        "resilience-gate-runtime",
+        "resilience-gate-payments",
+    }
+    for dashboard in dashboards:
+        assert dashboard["timezone"] == "utc"
+        assert len({panel["id"] for panel in dashboard["panels"]}) == len(
+            dashboard["panels"]
+        )
+
+    all_queries = "\n".join(
+        expression
+        for dashboard in dashboards
+        for expression in panel_expressions(dashboard)
+    )
+    assert "payment_replay_attempts_total" not in all_queries
+    assert "payment_facilitator_duration_seconds_bucket" not in all_queries
+    assert "url_shortener_payment_replays_total" in all_queries
+    assert "url_shortener_facilitator_request_duration_seconds_bucket" in all_queries
+
+    chaos_queries = "\n".join(panel_expressions(chaos))
+    assert '{namespace="resilience-gate",container="chaos-gate"}' in chaos_queries
+    assert '{namespace="url-shortener",pod=~".*chaos-gate.*"}' not in chaos_queries
+    assert "|!=" not in chaos_queries
+    assert '!= "/livez" != "/ready"' in chaos_queries
+
+    payment_queries = panel_expressions(payments)
+    privacy_queries = [
+        expression
+        for expression in payment_queries
+        if "signer_wallet_" in expression
+    ]
+    assert len(privacy_queries) == 2
+    assert all("max by (wallet_index)" in expression for expression in privacy_queries)
+    assert all("address" not in expression for expression in privacy_queries)
+
+    rendered_dashboard_maps = {
+        document["metadata"]["name"]: document
+        for document in documents
+        if document["kind"] == "ConfigMap"
+        and document["metadata"].get("labels", {}).get("grafana_dashboard") == "1"
+    }
+    assert {
+        "url-shortener-dashboard",
+        "chaos-demo-dashboard",
+        "resilience-runtime-dashboard",
+        "resilience-payment-dashboard",
+    } <= rendered_dashboard_maps.keys()
 
 
 def test_gitops_bootstrap_orders_monitoring_before_its_secret() -> None:

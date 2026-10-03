@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: resilience-payment-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+data:
+  resilience-payment.json: |
+    {
+      "uid": "resilience-gate-payments",
+      "title": "Resilience Gate — payments and signer",
+      "description": "x402 outcomes, facilitator behavior, signer performance, and privacy-safe Permit2 readiness.",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "time": {"from": "now-30m", "to": "now"},
+      "timezone": "utc",
+      "tags": ["resilience-gate", "payments"],
+      "links": [{
+        "asDropdown": true,
+        "icon": "dashboard",
+        "includeVars": true,
+        "keepTime": true,
+        "tags": ["resilience-gate"],
+        "targetBlank": false,
+        "title": "Resilience Gate dashboards",
+        "type": "dashboards"
+      }],
+      "templating": {
+        "list": [{
+          "name": "namespace",
+          "label": "Environment",
+          "type": "custom",
+          "query": "url-shortener-staging,url-shortener-prod,url-shortener-dev",
+          "current": {"text": "url-shortener-staging", "value": "url-shortener-staging"},
+          "options": [
+            {"text": "url-shortener-staging", "value": "url-shortener-staging"},
+            {"text": "url-shortener-prod", "value": "url-shortener-prod"},
+            {"text": "url-shortener-dev", "value": "url-shortener-dev"}
+          ]
+        }]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Paid /shorten HTTP outcomes",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum by (status) (rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler=\"/shorten\",method=\"POST\"}[1m]))",
+            "legendFormat": "HTTP {{ "{{status}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"unit": "reqps", "min": 0}}
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Application payment decisions",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum by (outcome) (rate(url_shortener_payment_outcomes_total{job=\"url-shortener\",namespace=\"$namespace\"}[1m]))",
+            "legendFormat": "{{ "{{outcome}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"unit": "ops", "min": 0}}
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Settled payment success (5m)",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 8, "w": 6, "h": 6},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(rate(url_shortener_payment_outcomes_total{job=\"url-shortener\",namespace=\"$namespace\",outcome=\"settled\"}[5m])) / clamp_min(sum(rate(url_shortener_payment_outcomes_total{job=\"url-shortener\",namespace=\"$namespace\",outcome!=\"required\"}[5m])),0.000001)"
+          }],
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.9}, {"color": "green", "value": 0.95}]}}},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"}
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Replay attempts in selected range",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 6, "y": 8, "w": 6, "h": 6},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(increase(url_shortener_payment_replays_total{job=\"url-shortener\",namespace=\"$namespace\"}[$__range])) or vector(0)"
+          }],
+          "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+          "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"}
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Facilitator verify / settle throughput",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 8, "w": 12, "h": 6},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum by (exported_endpoint,outcome) (rate(url_shortener_facilitator_calls_total{job=\"url-shortener\",namespace=\"$namespace\"}[1m]))",
+            "legendFormat": "{{ "{{exported_endpoint}} {{outcome}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"unit": "ops", "min": 0}}
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Facilitator latency",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 14, "w": 12, "h": 8},
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.50,sum by (le,exported_endpoint) (rate(url_shortener_facilitator_request_duration_seconds_bucket{job=\"url-shortener\",namespace=\"$namespace\"}[5m])))*1000",
+              "legendFormat": "{{ "{{exported_endpoint}} p50" }}"
+            },
+            {
+              "refId": "B",
+              "expr": "histogram_quantile(0.95,sum by (le,exported_endpoint) (rate(url_shortener_facilitator_request_duration_seconds_bucket{job=\"url-shortener\",namespace=\"$namespace\"}[5m])))*1000",
+              "legendFormat": "{{ "{{exported_endpoint}} p95" }}"
+            }
+          ],
+          "fieldConfig": {"defaults": {"unit": "ms", "min": 0}}
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Signer signing throughput",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 14, "w": 12, "h": 8},
+          "targets": [{
+            "refId": "A",
+            "expr": "sum by (outcome) (rate(signer_sign_total{namespace=\"$namespace\"}[1m]))",
+            "legendFormat": "{{ "{{outcome}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"unit": "ops", "min": 0}}
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Signer p50 / p95 latency",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 22, "w": 12, "h": 7},
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.50,sum by (le) (rate(signer_sign_duration_seconds_bucket{namespace=\"$namespace\"}[5m])))*1000",
+              "legendFormat": "p50"
+            },
+            {
+              "refId": "B",
+              "expr": "histogram_quantile(0.95,sum by (le) (rate(signer_sign_duration_seconds_bucket{namespace=\"$namespace\"}[5m])))*1000",
+              "legendFormat": "p95"
+            }
+          ],
+          "fieldConfig": {"defaults": {"unit": "ms", "min": 0}}
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Permit2 allowance ready (address removed)",
+          "description": "The query aggregates strictly by wallet_index, removing the address label before Grafana receives the series.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 22, "w": 6, "h": 7},
+          "targets": [{
+            "refId": "A",
+            "expr": "max by (wallet_index) (signer_wallet_permit2_allowance_units{namespace=\"$namespace\"}) > bool 0",
+            "legendFormat": "wallet {{ "{{wallet_index}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"min": 0, "max": 1, "decimals": 0}}
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "Bounded run budget floor met (address removed)",
+          "description": "Boolean readiness only; raw balance and address labels are intentionally not displayed.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 18, "y": 22, "w": 6, "h": 7},
+          "targets": [{
+            "refId": "A",
+            "expr": "max by (wallet_index) (signer_wallet_sbc_balance_units{namespace=\"$namespace\"}) >= bool 210000",
+            "legendFormat": "wallet {{ "{{wallet_index}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"min": 0, "max": 1, "decimals": 0}}
+        }
+      ]
+    }

@@ -10,18 +10,47 @@ data:
     {
       "uid": "resilience-gate-chaos",
       "title": "Resilience Gate — chaos verification",
+      "description": "Traffic, bounded errors, recovery signals, and scoped run evidence.",
       "schemaVersion": 39,
-      "version": 1,
+      "version": 2,
       "refresh": "10s",
       "time": {"from": "now-30m", "to": "now"},
+      "timezone": "utc",
       "tags": ["resilience-gate", "chaos"],
+      "links": [{
+        "asDropdown": true,
+        "icon": "dashboard",
+        "includeVars": true,
+        "keepTime": true,
+        "tags": ["resilience-gate"],
+        "targetBlank": false,
+        "title": "Resilience Gate dashboards",
+        "type": "dashboards"
+      }],
+      "annotations": {
+        "list": [{
+          "builtIn": 0,
+          "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+          "enable": true,
+          "hide": false,
+          "iconColor": "green",
+          "name": "Chaos gate verdicts",
+          "target": {"limit": 100, "matchAny": false, "tags": ["chaos-gate"], "type": "tags"},
+          "type": "dashboard"
+        }]
+      },
       "templating": {
         "list": [{
           "name": "namespace",
           "label": "Environment",
           "type": "custom",
           "query": "url-shortener-staging,url-shortener-prod,url-shortener-dev",
-          "current": {"text": "url-shortener-staging", "value": "url-shortener-staging"}
+          "current": {"text": "url-shortener-staging", "value": "url-shortener-staging"},
+          "options": [
+            {"text": "url-shortener-staging", "value": "url-shortener-staging"},
+            {"text": "url-shortener-prod", "value": "url-shortener-prod"},
+            {"text": "url-shortener-dev", "value": "url-shortener-dev"}
+          ]
         }]
       },
       "panels": [
@@ -31,7 +60,11 @@ data:
           "title": "User traffic during experiment",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
-          "targets": [{"refId": "A", "expr": "sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/livez|/ready\"}[1m])) by (handler)", "legendFormat": "{{ "{{handler}}" }}"}],
+          "targets": [{
+            "refId": "A",
+            "expr": "sum by (handler) (rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\"}[1m]))",
+            "legendFormat": "{{ "{{handler}}" }}"
+          }],
           "fieldConfig": {"defaults": {"unit": "reqps"}}
         },
         {
@@ -40,26 +73,91 @@ data:
           "title": "5xx rate (must remain bounded)",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
-          "targets": [{"refId": "A", "expr": "sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",status=~\"5..\"}[1m]))", "legendFormat": "5xx/s"}],
+          "targets": [{
+            "refId": "A",
+            "expr": "sum(rate(http_requests_total{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\",status=~\"5..\"}[1m]))",
+            "legendFormat": "5xx/s"
+          }],
           "fieldConfig": {"defaults": {"unit": "reqps"}}
         },
         {
           "id": 3,
-          "type": "logs",
-          "title": "Application logs (probes excluded)",
-          "datasource": {"type": "loki", "uid": "loki"},
-          "gridPos": {"x": 0, "y": 8, "w": 12, "h": 11},
-          "targets": [{"refId": "A", "expr": "{namespace=\"$namespace\",app=\"url-shortener\"} |!= \"/livez\" |!= \"/ready\"", "queryType": "range"}],
-          "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending"}
+          "type": "timeseries",
+          "title": "Request p95 during faults",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+          "targets": [{
+            "refId": "A",
+            "expr": "histogram_quantile(0.95,sum by (le,handler) (rate(http_request_duration_seconds_bucket{job=\"url-shortener\",namespace=\"$namespace\",handler!~\"/(livez|ready|metrics)\"}[1m])))*1000",
+            "legendFormat": "{{ "{{handler}} p95" }}"
+          }],
+          "fieldConfig": {"defaults": {"unit": "ms"}}
         },
         {
           "id": 4,
+          "type": "timeseries",
+          "title": "Fault targets: unavailable then recovered",
+          "description": "Kubernetes Ready state for PostgreSQL, Redis, and the signer; 0 marks the injected outage and 1 marks recovery.",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+          "targets": [{
+            "refId": "A",
+            "expr": "min by (pod) (kube_pod_status_ready{namespace=\"$namespace\",condition=\"true\",pod=~\"$namespace-(postgresql-0|redis-master-0)|radius-signer-.*\"})",
+            "legendFormat": "{{ "{{pod}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"min": 0, "max": 1, "decimals": 0}}
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Application and signer restarts",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"x": 0, "y": 16, "w": 24, "h": 6},
+          "targets": [{
+            "refId": "A",
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\",container=~\"url-shortener|radius-signer\"}[2m])",
+            "legendFormat": "{{ "{{container}} {{pod}}" }}"
+          }],
+          "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0}}
+        },
+        {
+          "id": 6,
           "type": "logs",
-          "title": "Chaos gate scorecard logs",
+          "title": "Application degradation evidence",
           "datasource": {"type": "loki", "uid": "loki"},
-          "gridPos": {"x": 12, "y": 8, "w": 12, "h": 11},
-          "targets": [{"refId": "A", "expr": "{namespace=\"url-shortener\",pod=~\".*chaos-gate.*\"}", "queryType": "range"}],
+          "gridPos": {"x": 0, "y": 22, "w": 12, "h": 10},
+          "targets": [{
+            "refId": "A",
+            "expr": "{namespace=\"$namespace\",container=\"url-shortener\"} != \"/livez\" != \"/ready\" |~ \"503|database unavailable|cache\"",
+            "queryType": "range"
+          }],
           "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending"}
+        },
+        {
+          "id": 7,
+          "type": "logs",
+          "title": "Chaos gate verdict and cleanup",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 12, "y": 22, "w": 12, "h": 10},
+          "targets": [{
+            "refId": "A",
+            "expr": "{namespace=\"resilience-gate\",container=\"chaos-gate\"} |~ \"GATE VERDICT|annotate: posted|verified cleanup\"",
+            "queryType": "range"
+          }],
+          "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Ascending"}
+        },
+        {
+          "id": 8,
+          "type": "logs",
+          "title": "Bounded k6 load generator",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 0, "y": 32, "w": 24, "h": 10},
+          "targets": [{
+            "refId": "A",
+            "expr": "{namespace=\"$namespace\",container=\"k6\",pod=~\"loadgen-.*\"}",
+            "queryType": "range"
+          }],
+          "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Ascending"}
         }
       ]
     }

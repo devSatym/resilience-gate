@@ -91,8 +91,14 @@ observed dependency failure, observed recovery, and verified cleanup.
 - Prometheus retention: 7 days, bounded by 8 GB, backed by a 10 GiB PVC.
 - Loki: single-binary filesystem mode, 72-hour retention, 10 GiB PVC.
 - Alloy: one Kubernetes-API log collector replica.
-- Grafana: dashboards loaded through labeled ConfigMaps; credentials supplied
-  by External Secrets.
+- Grafana: four UTC dashboards loaded through labeled ConfigMaps; credentials
+  supplied by External Secrets:
+  - `resilience-gate-app` — HTTP health, latency, dependencies, and cache;
+  - `resilience-gate-chaos` — fault windows, recovery, restarts, and scoped logs;
+  - `resilience-gate-runtime` — replicas, pod readiness, resources, and scrapes;
+  - `resilience-gate-payments` — x402, facilitator, and signer signals.
+- Wallet readiness panels aggregate only by `wallet_index`; address labels and
+  raw balances are intentionally excluded from the displayed series.
 - Application ServiceMonitors are restricted to dev, staging, and prod
   namespaces and selected by the `release: observability` label.
 

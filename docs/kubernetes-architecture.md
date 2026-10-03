@@ -86,6 +86,11 @@ targets are useful only after the chart is actually installed and its sources
 are producing data; a rendered dashboard does not prove collection or alerting
 works.
 
+Four focused Grafana dashboards separate application health, chaos evidence,
+Kubernetes runtime state, and payment/signer telemetry. Chaos logs are scoped
+to the gate container in the `resilience-gate` namespace. Payment readiness
+queries remove wallet address labels before Grafana receives the series.
+
 ### Bounded chaos verification design
 
 The staging stage references both service-health and chaos-gate analyses. The
