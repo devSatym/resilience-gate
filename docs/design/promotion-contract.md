@@ -26,11 +26,13 @@ workload identity.
 
 ## Promotion boundaries
 
-Development may auto-promote after its normal service-health verification.
-Staging accepts Freight only from development and remains manually promoted.
-The production-like testnet Stage accepts Freight only from staging and remains
-manual. Its readiness and liveness verification runs only after the candidate
-has passed the upstream staging health and chaos contracts.
+Development can automatically promote new Warehouse Freight, reconcile it,
+and run service-health verification. The normal staging path accepts Freight
+verified in development and remains manually promoted. The normal prod-like
+path accepts Freight verified in staging and also remains manual. Its
+readiness and liveness verification follows the upstream staging health and
+chaos contracts. A separate manual Freight approval is an operator override,
+not evidence that the upstream verification passed.
 
 The Git credential is an ExternalSecret backed by the shared
 `resilience-gate-secrets` ClusterSecretStore. Its value is never stored in
@@ -47,10 +49,24 @@ Application, absent testnet funding, stale telemetry, or later chaos-gate
 failure blocks the relevant later action instead of being bypassed here.
 
 Before any manual testnet promotion, an operator must review the exact Freight
-digest, rendered branch commit, stage policy, application health, and the
-evidence requirements documented by the later gate and operations runbooks.
+digest and chart-source revision, current rendered state, stage policy,
+application health, and the evidence requirements documented by the later
+gate and operations runbooks. The promotion creates a new rendered branch
+commit; that output must then be linked to the requested Freight and observed
+Argo CD reconciliation before claiming success.
 
-The 2 October 2026 verification campaign exercised this path through all three
+The historical October 2 campaign exercised this path through all three
 Stages, including a negative candidate that failed staging and a corrected
-candidate that completed production-like post-deploy verification. See the
-[verification report](../verification-report.md).
+candidate that completed prod-like post-deploy verification. On October 3,
+fresh `v1.0.0` Freight `d3b4380…` passed staging chaos verification and then
+prod-like readiness/liveness. Its rendered revisions were `64d2dde` in staging
+and `7d334d5` in prod; all three Stages ended on that same Freight. The
+[verification report](../verification-report.md) records the full identities,
+and the [screenshot gallery](../screenshots/README.md) labels the historical
+and fresh windows separately.
+
+These checks establish environment health and release verification for the
+recorded candidate. Cosign verification occurs at CI publication; the current
+Stages do not independently verify image signatures or consume the CI identity
+artifact. That separate trust boundary is documented in
+[artifact identity](artifact-identity.md).

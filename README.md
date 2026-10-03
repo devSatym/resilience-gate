@@ -1,259 +1,238 @@
-# Resilience Gate — Chaos-Verified Kubernetes Release Platform
+<div align="center">
 
-> A production-style GitOps platform that promotes an immutable Kubernetes
-> release only after it proves health, paid-traffic readiness, bounded
-> dependency-failure tolerance, recovery, and cleanup.
+![Resilience Gate — release confidence, measured under failure](docs/diagrams/readme-hero.svg)
 
-[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](app/)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-GKE_Standard-326CE5?logo=kubernetes&logoColor=white)](docs/kubernetes-architecture.md)
-[![GitOps](https://img.shields.io/badge/GitOps-Argo_CD_+_Kargo-EF7B4D?logo=argo&logoColor=white)](kubernetes/)
-[![IaC](https://img.shields.io/badge/IaC-Terraform-844FBA?logo=terraform&logoColor=white)](gke_terraform/)
-[![Chaos](https://img.shields.io/badge/Chaos-Chaos_Mesh-D7B377)](kubernetes/chaos-experiments/)
-[![Payments](https://img.shields.io/badge/Payments-x402_+_Permit2-111827)](docs/design/payment-contract.md)
+<h1>Resilience Gate</h1>
 
-Resilience Gate is an end-to-end platform-engineering project built around a
-deliberately small FastAPI URL shortener. The application is only the payload.
-The project demonstrates the harder release-engineering work around it:
-immutable artifact identity, keyless CI publication, rendered-environment
-GitOps, staged promotion, external secret delivery, observability, paid
-testnet traffic, controlled chaos, fail-closed scoring, recovery, and
-auditable evidence.
+<p><strong>An immutable release. Real paid testnet traffic. Three dependency failures.<br/>One evidence-backed promotion decision.</strong></p>
+
+[![CI snapshot](https://img.shields.io/badge/CI_snapshot-passing-22c55e?style=flat-square)](https://github.com/devSatym/resilience-gate/actions/runs/37123284920)
+[![Release](https://img.shields.io/badge/release-v1.0.0-14b8a6?style=flat-square)](https://github.com/devSatym/resilience-gate/releases/tag/v1.0.0)
+[![Tests](https://img.shields.io/badge/project_tests-231_passing-22c55e?style=flat-square)](docs/verification-report.md)
+[![Signer](https://img.shields.io/badge/signer_tests-13_passing-22c55e?style=flat-square)](signer/test_permit2.py)
+[![Scope](https://img.shields.io/badge/verified-owned_testnet-38bdf8?style=flat-square)](docs/known-limitations.md)
+
+<p>
+<a href="#see-the-platform">See the platform</a> ·
+<a href="#architecture">Architecture</a> ·
+<a href="#run-it-locally">Run locally</a> ·
+<a href="docs/screenshots/README.md">Evidence gallery</a> ·
+<a href="docs/verification-report.md">Verification report</a>
+</p>
+
+<p>
+<a href="app/"><img src="docs/diagrams/icons/stack-python.svg" alt="Python and FastAPI" width="82" height="82"/></a>
+<a href="docs/kubernetes-architecture.md"><img src="docs/diagrams/icons/stack-kubernetes.svg" alt="Kubernetes and GKE" width="82" height="82"/></a>
+<a href="gke_terraform/"><img src="docs/diagrams/icons/stack-terraform.svg" alt="Terraform" width="82" height="82"/></a>
+<a href="kubernetes/argocd/"><img src="docs/diagrams/icons/stack-argo.svg" alt="Argo CD" width="82" height="82"/></a>
+<a href="kubernetes/kargo/"><img src="docs/diagrams/icons/stack-kargo.svg" alt="Kargo" width="82" height="82"/></a>
+<a href="helm/observability/"><img src="docs/diagrams/icons/stack-prometheus.svg" alt="Prometheus" width="82" height="82"/></a>
+<a href="helm/observability/"><img src="docs/diagrams/icons/stack-grafana.svg" alt="Grafana" width="82" height="82"/></a>
+<a href="kubernetes/chaos-experiments/"><img src="docs/diagrams/icons/stack-chaos.svg" alt="Chaos Mesh" width="82" height="82"/></a>
+<a href="docs/design/payment-contract.md"><img src="docs/diagrams/icons/stack-payments.svg" alt="x402 and Permit2" width="82" height="82"/></a>
+</p>
+
+</div>
+
+Resilience Gate is a platform-engineering project built around a small FastAPI
+URL shortener. The application carries the release through a complete GCP and
+Kubernetes delivery system: keyless image publication, Cosign signatures,
+Kargo Freight, rendered GitOps branches, external secrets, paid x402 traffic,
+controlled chaos, fail-closed scoring, recovery, and verified cleanup.
+
+The release question is concrete: **can this exact candidate serve useful
+traffic, tolerate bounded dependency faults, recover, and leave the lab clean?**
+The staging gate turns that question into a machine-readable verdict before
+the candidate becomes eligible for the production-like testnet Stage.
 
 > [!NOTE]
-> **Verified on 2 October 2026 in a private, owned GCP testnet lab.** The full
-> dev → staging → production-like path completed successfully. This is a
-> scoped testnet verification, not a mainnet, public-production, compliance,
-> or financial-custody claim. See the
+> **Verified snapshot: 3 October 2026.** The `v1.0.0` application Freight
+> completed dev → staging → `prod` on the existing two-node owned GKE lab.
+> `prod` means **production-like testnet** throughout this repository.
+> Exact source, chart, render, image and analysis identities are in the
 > [verification report](docs/verification-report.md).
 
-## What was verified
+## The engineering behind the verdict
 
-| Area | Verified result |
+| Release concern | Implemented contract |
 | --- | --- |
-| Source quality | 230 project tests passed, 1 intentionally deselected; 13 signer tests passed; Helm, Terraform, Kustomize, shell, Compose, and diagram checks passed. |
-| Cloud platform | Two Ready `e2-standard-4` nodes in a zonal GKE Standard cluster with Workload Identity. |
-| GitOps | All eight Argo CD Applications were `Synced` and `Healthy`. |
-| Promotion | Kargo `dev`, `staging`, and production-like `prod` Stages were `Steady`; their latest verifications were `Successful`. |
-| Workloads | Dev ran 1 app replica, staging 2 plus the signer, and prod 3; PostgreSQL and Redis were Ready in every environment. |
-| Baseline | Bounded dev traffic passed: 44.89 requests observed, zero 5xx responses, 95 ms p95 latency, and healthy dependencies. |
-| Paid testnet path | The staging smoke observed `402 → signed 201 → redirect 302 → replay 409` without emitting wallet, signature, payment-header, or transaction identifiers. |
-| Negative gate | A deliberately degraded staging candidate failed before fault injection because paid traffic could not be proven. It did not advance. |
-| Chaos and recovery | PostgreSQL, Redis, and signer pod-failure scenarios passed fail-closed scorecards and a clean re-verification. |
-| Prod-like promotion | Kargo promotion succeeded; readiness and liveness analyses passed; Argo CD reconciled the digest-pinned render; 3/3 app replicas were Ready. |
-| Cleanup | No residual Workflow, WorkflowNode, PodChaos, run-scoped Job, or Lease remained after validation. |
-| Evidence hygiene | 16 metadata records and 238 retained files passed schema, raw-name, symlink, sensitive-pattern, and encoded-data audits. |
+| **Know exactly what shipped** | OCI digest, Git source, rendered revision, signer and gate runtime identities travel with the evidence. GitHub OIDC publishes without a stored cloud key; Cosign signs and verifies the image. |
+| **Promote configuration with the candidate** | Kargo renders manifests to `env/dev`, `env/staging`, and `env/prod`. Argo CD reconciles those outputs. Dev auto-promotes; staging and prod require operator promotion. |
+| **Prove useful traffic first** | The gate checks the ready target and exclusive Lease, then uses the suspended load source to establish paid traffic before injecting a fault. |
+| **Measure the failure and recovery** | Serial PostgreSQL, Redis and signer pod-failure experiments must show a real outage, bounded errors and latency, then recovery. |
+| **Fail when evidence is incomplete** | Empty, stale, malformed, non-finite or insufficient telemetry fails the scorecard. A dependency that never goes down also fails the experiment. |
+| **Make cleanup part of success** | A successful gate Job also requires verified cleanup of its Workflow, fault objects, load Job and Lease; the final audit checks WorkflowNodes and other residual resources. |
 
-Five consecutive GitHub validation runs for the final source/fix sequence also
-passed. Exact revisions, run identifiers, evidence boundaries, and the final
-inventory are recorded in the
+## See the platform
+
+### One release through three Stages
+
+[![Kargo pipeline with the same release Freight across dev, staging and prod](docs/screenshots/assets/10-kargo-pipeline-final.png)](docs/screenshots/README.md#the-fresh-v100-release)
+
+The final **3 October** pipeline shows `hoping-warthog` in all three Stages.
+The production-like Argo CD application reconciled `env/prod` revision
+`7d334d5` with all three application replicas Ready.
+
+### Failure, traffic and recovery in the same time window
+
+[![Grafana traffic, errors, latency and dependency recovery during the historical successful chaos run](docs/screenshots/assets/17-grafana-chaos-overview.png)](docs/screenshots/README.md#recovery-under-real-traffic)
+
+This is the **2 October historical successful run**, displayed over its exact
+UTC window. PostgreSQL, Redis and signer outage/recovery traces are correlated
+with paid traffic, 5xx rate and route p95. The fresh **3 October** candidate
+passed a separate gate; its identities and scorecards are recorded in the
 [verification report](docs/verification-report.md).
 
-## Why this project is different
+<details>
+<summary><strong>Explore the blocked candidate, payment path and final prod reconciliation</strong></summary>
 
-Many demo pipelines stop at “the container built” or “the pod is Ready.” This
-platform makes a narrower and more useful release claim:
+#### A failed staging candidate stays ineligible
 
-1. **The candidate is identifiable.** Git source, OCI digest, rendered branch,
-   running workload, signer, load generator, and gate runner are bound to
-   immutable identities.
-2. **The deployed configuration travels with the release.** Kargo renders
-   plain Kubernetes YAML to `env/dev`, `env/staging`, and `env/prod`; Argo CD
-   reconciles those outputs instead of rendering mutable `main` directly.
-3. **Useful traffic exists before a fault begins.** The gate refuses to inject
-   chaos when the target, paid traffic, telemetry, or exclusive Lease cannot
-   be proven.
-4. **Dependency failures are measured.** Chaos Mesh removes PostgreSQL, Redis,
-   and signer pods in bounded serial experiments while Prometheus supplies the
-   scoring window.
-5. **Missing evidence fails closed.** Empty, stale, malformed, non-finite, or
-   insufficient telemetry cannot silently become a passing zero.
-6. **Cleanup is part of the verdict.** A run does not pass until its exact
-   Workflow, load Job, PodChaos objects, and Lease are confirmed absent.
+[![Kargo production promotion selection disables Freight that did not pass staging](docs/screenshots/assets/13-kargo-prod-ineligible-freight.png)](docs/screenshots/README.md#when-the-gate-says-no)
+
+Historical Freight `intentional-liger` failed staging and was verified only in
+dev. Kargo v1.3 disables it in the normal prod promotion selector. The capture
+was cancelled without creating an approval or Promotion.
+
+#### Paid traffic has observable outcomes
+
+[![Historical payment and facilitator dashboard with settlement success and privacy-safe wallet readiness](docs/screenshots/assets/23-grafana-payment-settlement.png)](docs/screenshots/README.md#the-paid-request-path)
+
+The retained historical payment window shows settlement outcomes, facilitator
+latency and signer readiness. Wallet panels aggregate by `wallet_index`;
+addresses and payment payloads are excluded. The separate sanitized HTTP
+smoke recorded **`402 → signed 201 → redirect 302 → replay 409`**.
+
+#### The promoted candidate reaches a healthy resource tree
+
+[![Fresh production-like Argo CD application synced and healthy at revision 7d334d5](docs/screenshots/assets/29-argocd-prod-resource-tree.png)](docs/screenshots/README.md#the-fresh-v100-release)
+
+The **3 October** prod resource tree shows the freshly promoted release:
+`Synced`, `Healthy`, 21 green resources and three Ready application Pods.
+
+</details>
+
+**[Open the complete gallery →](docs/screenshots/README.md)** · 29 canonical
+captures + 5 detail companions, with narrow captions and explicit historical
+windows. Screenshots illustrate the platform; sanitized metadata and
+scorecards carry the run identities and verdicts.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  developer[Developer] -->|push| ci[GitHub Actions]
-  ci -->|OIDC publish + Cosign| gar[Artifact Registry]
-  ci -->|source revision| warehouse[Kargo Warehouse]
-  gar -->|OCI digest| warehouse
+[![Platform architecture: signed image publication, staged GitOps, workload identity, observability and the chaos gate](docs/diagrams/platform-architecture.svg)](docs/kubernetes-architecture.md)
 
-  warehouse --> dev[dev<br/>auto promotion + health]
-  dev --> staging[staging<br/>manual + health + chaos gate]
-  staging --> prod[prod-like testnet<br/>manual + post-deploy smoke]
-
-  dev -->|render env/dev| argocd[Argo CD]
-  staging -->|render env/staging| argocd
-  prod -->|render env/prod| argocd
-  argocd --> gke[GKE workloads]
-
-  gke --> metrics[Prometheus + Loki + Grafana]
-  metrics --> gate[Fail-closed scorer]
-  gate -->|PASS / FAIL| staging
-
-  eso[GCP Secret Manager<br/>+ External Secrets] --> gke
-  chaos[Chaos Mesh] -->|bounded dependency faults| gke
-  load[k6 + isolated Permit2 signer] -->|paid testnet traffic| gke
-  load --> facilitator[Radius x402 facilitator]
-```
-
-The platform separates ownership deliberately:
-
-- Terraform owns the GCP foundation: VPC, zonal GKE Standard cluster, node
-  identity, Artifact Registry, OIDC federation, and IAM.
-- Argo CD owns continuously reconciled platform and environment resources.
-- Kargo owns candidate discovery, rendered environment branches, promotion,
-  and verification.
-- External Secrets Operator owns secret materialization from GCP Secret
-  Manager through Workload Identity.
-- The chaos-gate Job owns one bounded run and only its run-scoped resources.
-
-Read the full [Kubernetes architecture](docs/kubernetes-architecture.md) and
-[configuration reference](docs/configuration-reference.md) for the ownership
-and configuration contracts.
-
-## Release path
-
-```text
-reviewed source + OCI digest
-        │
-        ▼
-Kargo Warehouse discovers Freight
-        │
-        ▼
-dev ── service-health verification ── PASS
-        │
-        ▼ manual promotion
-staging ── readiness + paid load + bounded chaos + scorecards + cleanup ── PASS
-        │
-        ▼ manual promotion
-prod-like testnet ── Argo CD sync + readiness + liveness ── PASS
-        │
-        ▼
-scoped evidence-backed testnet release claim
-```
-
-Dev is the only auto-promoted Stage. Staging and prod-like transitions remain
-explicit operator actions. A candidate that fails verification remains useful
-negative evidence, but it cannot become downstream Freight through the normal
-path.
-
-## Inside the chaos gate
-
-The staging AnalysisRun launches one digest-pinned gate-runner Job. Its
-orchestrator:
-
-1. validates the source revision and image digest;
-2. acquires a Kubernetes Lease to prevent concurrent gates;
-3. confirms a ready target and a suspended load-source CronJob;
-4. starts a uniquely named, bounded k6 Job;
-5. proves paid traffic before fault injection;
-6. runs serial PostgreSQL, Redis, and signer pod-failure experiments;
-7. scores traffic, dependency-down, error, latency, and recovery signals;
-8. optionally annotates Grafana; and
-9. deletes and verifies only the resources created for that run.
-
-| Guard | Failure behavior |
+| Owner | Responsibility |
 | --- | --- |
-| No ready target | Block before fault injection. |
-| Another gate owns the Lease | Block instead of overlapping experiments. |
-| Paid traffic is absent | Fail before injecting a meaningless fault. |
-| Telemetry is missing or stale | Fail the scorecard; never infer a healthy zero. |
-| Dependency never fails | Fail because the experiment was vacuous. |
-| Dependency does not recover | Fail the scenario. |
-| Cleanup is uncertain | Retain a failing verdict for investigation. |
+| **Terraform** | VPC, zonal GKE Standard, node identity, Artifact Registry, OIDC federation and IAM. |
+| **Argo CD** | Continuous reconciliation of platform controllers and rendered environment manifests. |
+| **Kargo** | Freight discovery, environment rendering, staged promotion and verification. |
+| **External Secrets Operator** | Secret materialization from GCP Secret Manager through Workload Identity. |
+| **Gate runner** | One bounded staging run: Lease, load, serial faults, scorecards and cleanup. |
+| **Prometheus · Grafana · Loki · Alloy** | Metrics, dashboards and logs used to observe and score the run. |
 
-See the [failure model](docs/design/failure-model.md),
-[chaos-gate runbook](docs/runbooks/chaos-gate.md), and retained
-[evidence index](docs/evidence/README.md).
+### The promotion path
 
-## Application and payment path
+[![Promotion flow from immutable Freight through dev health, staging chaos verification and prod smoke](docs/diagrams/promotion-flow.svg)](docs/design/promotion-contract.md)
 
-The workload is a URL-shortening API backed by PostgreSQL and Redis:
+Successful staging verification makes the Freight eligible for downstream
+selection. The prod-like promotion then performs Argo CD sync plus readiness
+and liveness checks; it does not repeat the paid chaos run.
 
-- `GET /livez` is process-only and does not turn a dependency outage into a
-  restart loop.
-- `GET /ready` checks the required dependency state.
-- `GET /metrics` exports application and payment signals for Prometheus.
-- `POST /shorten` returns an x402 v2 challenge when payment is required.
-- An isolated Permit2 signer creates authorizations without exposing private
-  keys to the application or load generator.
-- The application asks the testnet facilitator to verify and settle before it
-  persists the shortened URL.
-- A unique settlement identifier prevents application-level replay.
+<details>
+<summary><strong>Inside the fail-closed gate</strong></summary>
 
-The payment path is deliberately testnet-only. The observed smoke verifies the
-HTTP and application replay contract for one bounded execution; it does not
-claim custody controls, mainnet support, or universal settlement finality.
+![Gate lifecycle from identity and Lease preflight through paid load, serial faults, scoring and cleanup](docs/diagrams/chaos-gate.svg)
 
-## Technology map
+| Guard | Verdict when the contract cannot be proven |
+| --- | --- |
+| Target is unready or another run holds the Lease | Block before fault injection. |
+| Paid traffic cannot be established | Fail before injecting a meaningless fault. |
+| Telemetry is missing, stale or malformed | Fail; never interpret missing data as a healthy zero. |
+| A fault never becomes observable | Fail the vacuous experiment. |
+| The dependency does not recover | Fail the scenario. |
+| Run-scoped cleanup cannot be confirmed | The gate Job fails even if its scoring verdict was PASS; retain evidence for investigation. |
 
-| Layer | Technology | Responsibility |
-| --- | --- | --- |
-| Application | Python 3.12, FastAPI, SQLAlchemy, PostgreSQL, Redis | URL creation, redirects, health semantics, persistence, metrics, and payment enforcement. |
-| Payment boundary | x402 v2, Permit2, isolated FastAPI signer | Server-owned payment terms, EIP-712 authorization, settlement, and replay handling. |
-| Packaging | Docker, Helm, Kustomize | Reproducible images, environment overlays, hardened pod defaults, and rendered manifests. |
-| Infrastructure | Terraform, GCP, GKE Standard, Artifact Registry | Network, cluster, node pool, workload identity, image registry, IAM, and OIDC federation. |
-| CI and supply chain | GitHub Actions, Workload Identity Federation, Cosign | Credential-free validation, immutable publication, signing, verification, and identity records. |
-| GitOps | Argo CD app-of-apps and ApplicationSet | Continuous reconciliation of platform resources and rendered environment branches. |
-| Promotion | Kargo, Argo Rollouts AnalysisTemplates | Freight discovery, staged rendering, explicit promotion, and health/chaos verification. |
-| Secrets | GCP Secret Manager, External Secrets Operator | Keyless secret delivery without committed Kubernetes Secret data. |
-| Observability | Prometheus, Grafana, Loki, Alloy | Metrics, dashboards, logs, and the evidence used by scoring. |
-| Resilience | Chaos Mesh, k6, custom Python scorer | Bounded dependency faults, paid traffic, fail-closed scorecards, and recovery verification. |
+See the [failure model](docs/design/failure-model.md) and
+[chaos-gate runbook](docs/runbooks/chaos-gate.md).
 
-## Repository map
+</details>
 
-```text
-app/                         FastAPI URL shortener and x402 enforcement
-signer/                      Isolated Permit2 signing service
-helm/url-shortener/          Workload chart and dev/staging/prod overlays
-helm/observability/          Prometheus, Grafana, Loki, Alloy, dashboards
-kubernetes/argocd/           Root GitOps application
-kubernetes/apps/             AppProject and environment ApplicationSet
-kubernetes/bootstrap/        Platform Applications and secret-store contracts
-kubernetes/kargo/            Warehouse, Stages, promotion and analysis templates
-kubernetes/jobs/             Suspended load source and signer workload
-kubernetes/chaos-experiments/  Workflow, RBAC, orchestrator and scorer
-docker/gate-runner/           Immutable chaos-gate runtime image
-gke_terraform/               GCP and GKE foundation
-platform_setup_scripts/      Guarded bootstrap and read-only verification
-scripts/                     Validation, evidence, load and lifecycle tooling
-schemas/                     Evidence and scorecard schemas
-tests/                       Application, platform, GitOps and gate contracts
-docs/                        Architecture, design decisions, runbooks and evidence
-```
+<details>
+<summary><strong>Inside the x402 / Permit2 payment path</strong></summary>
 
-Private planning files and reusable local secret material are intentionally
-excluded through `.gitignore`; they are not part of the public project surface.
+![Payment flow from x402 challenge through isolated Permit2 signing, facilitator verification and settlement, persistence and replay handling](docs/diagrams/payment-flow.svg)
 
-## Run locally
+`POST /shorten` charges for new URL creation. The server owns the payment
+terms; an isolated signer supplies a Permit2 authorization; the application
+asks the testnet facilitator to verify and settle before persisting the URL.
+A unique settlement identity prevents application-level replay.
 
-Prerequisites: Python 3.12, Docker with Compose, Helm, Terraform, and `kubectl`
-with Kustomize support.
+The health model supports recovery: `/livez` is process-only, `/ready` requires
+PostgreSQL, and Redis can fall back to PostgreSQL after initial readiness.
+`/metrics` exposes request, dependency and payment signals.
+
+See the [payment contract](docs/design/payment-contract.md) for HTTP behavior,
+signer boundaries and settlement/persistence consistency limits.
+
+</details>
+
+## What the recorded validation proves
+
+| Check | Recorded result |
+| --- | --- |
+| **Source validation** | 231 project tests passed; 1 integration test intentionally deselected locally. 13 signer tests passed. Helm, Terraform, Kustomize, shell, Compose and diagram checks passed. |
+| **CI** | The latest audited `main` validation run passed at `7ea5e91`; CI also exercises the marked local recovery integration test and builds all three runtime images. |
+| **Fixed lab** | Two `e2-standard-4` nodes, GKE Standard, Workload Identity; the fresh staging/prod campaign created or resized no cloud resources. |
+| **Reconciliation and secrets** | Eight Argo CD Applications healthy/synced; all nine ExternalSecrets ready; populated Prometheus target pools up. |
+| **Fresh staging gate** | Freight `d3b4380…` passed PostgreSQL, Redis and signer scorecards on 3 October; readiness and `chaos-verdict` succeeded. |
+| **Fresh prod-like promotion** | The same Freight passed readiness/liveness, synced render `7d334d5`, and reached 3/3 Ready application replicas. |
+| **Negative behavior** | Retained historical failures demonstrate blocking, insufficient paid traffic, missing telemetry, no-target and timeout/cleanup contracts within their recorded scope. |
+| **Cleanup** | No residual run-scoped load, Chaos Mesh resources or gate Lease; the load-source CronJob remained suspended. |
+
+The [`v1.0.0` application release](https://github.com/devSatym/resilience-gate/releases/tag/v1.0.0)
+is at `3b70835`; the chart source carried by the fresh Freight is `0a98c08`.
+Platform source `7ea5e91` includes the later observability corrections. These
+are distinct identities, all recorded in the
+[verification report](docs/verification-report.md) and
+[evidence index](docs/evidence/README.md). A historical pass does not validate
+a later candidate automatically.
+
+## Run it locally
+
+Start with the source contracts. Prerequisites: Python 3.12, Docker with
+Compose, Helm, Terraform and `kubectl` with Kustomize support.
 
 ```bash
+git clone https://github.com/devSatym/resilience-gate.git
+cd resilience-gate
+
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python -m pip install -r signer/requirements.lock
 
-# Hermetic tests; integration/live markers remain opt-in.
 PYTHON=.venv/bin/python make test
-
-# Helm, Terraform, Kustomize, shell, Compose, application and signer checks.
 PYTHON=.venv/bin/python make validate
+```
 
-# Optional local unpaid Postgres/Redis recovery smoke.
+Validation may download pinned dependencies when uncached. It does not apply
+infrastructure or start a live testnet run. The
+[offline walkthrough](docs/demo-walkthrough.md) explains what each check proves.
+
+For an end-to-end local unpaid application and Redis-recovery smoke:
+
+```bash
 make smoke-local
 ```
 
-`make validate` may download pinned dependencies when they are not cached. It
-does not apply Terraform, mutate Kubernetes, start paid traffic, or run chaos.
-The [offline demo](docs/demo-walkthrough.md) explains those boundaries.
+This builds the Compose stack, creates and resolves a URL, temporarily stops
+Redis, verifies liveness and steady-state readiness, then removes the local
+containers and disposable volumes. See
+[local development](docs/runbooks/local-development.md).
 
-## Operate the private testnet lab
+<details>
+<summary><strong>Explore the owned testnet operator tools</strong></summary>
 
-Public operator configuration is local and ignored:
+Public operator identifiers are rendered from an ignored local config:
 
 ```bash
 make config
@@ -262,54 +241,68 @@ make render-config
 git diff -- kubernetes/
 ```
 
-Review the rendered public identifiers before any mutating phase. Secret
-values belong in GCP Secret Manager, never in `config.env`, command arguments,
-manifests, evidence, or Git.
-
-Useful guarded entry points:
+Review configuration changes before deployment. Secret values belong in GCP
+Secret Manager. Planning and read-only entry points include:
 
 ```bash
-# Read-only live state.
 ./scripts/lab-ops.sh status
-
-# Dry-run the bootstrap sequence.
 ./scripts/lab-ops.sh bootstrap-plan
-
-# Review a load run without contacting the cluster or testnet.
 ./scripts/run-loadgen.sh --plan --duration 10m --vus 3
-
-# Review a Kargo verification request without executing it.
 ./scripts/validate-live.sh --plan --scenario chaos-gate
 ```
 
-Mutating bootstrap, paid traffic, promotions, chaos, and teardown require
-their explicit acknowledgements and exact target-context checks. Start with
-the [lab lifecycle](docs/runbooks/lab-lifecycle.md),
-[load-testing](docs/runbooks/load-testing.md), and
+Bootstrap, paid traffic, chaos, promotion and teardown use explicit
+acknowledgements and exact-context checks. Follow the
+[lab lifecycle](docs/runbooks/lab-lifecycle.md),
+[load-testing](docs/runbooks/load-testing.md),
+[payment](docs/runbooks/testnet-payments.md) and
 [chaos-gate](docs/runbooks/chaos-gate.md) runbooks.
 
-## Engineering decisions worth reviewing
+</details>
 
-- [Artifact identity](docs/design/artifact-identity.md) — digest-first delivery,
-  keyless signing, identity records, and registry retention.
-- [Promotion contract](docs/design/promotion-contract.md) — rendered branches,
-  Kargo ownership, manual boundaries, and Argo CD synchronization.
-- [Payment contract](docs/design/payment-contract.md) — server-owned x402 terms,
-  Permit2 signing, facilitator handling, replay, and consistency limits.
-- [Failure model](docs/design/failure-model.md) — what pass, fail, blocked, and
-  unavailable mean, including telemetry and cleanup boundaries.
-- [Known limitations](docs/known-limitations.md) — the intentionally narrow
-  testnet scope and what this project does not claim.
+## Find your way through the repository
 
-The complete documentation map is in [docs/README.md](docs/README.md).
+```text
+app/                         FastAPI URL shortener, health and x402 enforcement
+signer/                      Isolated Permit2 signing service
+helm/url-shortener/          Workload chart and dev / staging / prod profiles
+helm/observability/          Prometheus, Grafana, Loki, Alloy and dashboards
+kubernetes/argocd/           Root GitOps application
+kubernetes/apps/             AppProject and environment ApplicationSet
+kubernetes/bootstrap/        Platform Applications and secret-store contracts
+kubernetes/kargo/            Warehouse, Stages, promotion and analysis templates
+kubernetes/jobs/             Suspended load source and signer workload
+kubernetes/chaos-experiments/  Workflow, RBAC, orchestrator and scorer
+docker/gate-runner/           Digest-pinned gate runtime
+gke_terraform/               GCP and GKE foundation
+platform_setup_scripts/      Guarded bootstrap and read-only verification
+scripts/                     Validation, evidence, load and lifecycle tools
+schemas/                     Evidence and scorecard schemas
+tests/                       Application, platform, GitOps and gate contracts
+docs/                        Design, diagrams, gallery, runbooks and evidence
+```
 
-## Project status
+## Go deeper
 
-The implementation, private GCP deployment, baseline, paid staging smoke,
-negative regression gate, healthy chaos run, recovery exercise, and
-production-like promotion have been completed and verified for the stated
-testnet scope. Operational state can drift after the recorded snapshot, so
-future changes must run the same validation and evidence process again.
+| If you want to… | Read |
+| --- | --- |
+| Understand component ownership and failure boundaries | [Kubernetes architecture](docs/kubernetes-architecture.md) · [configuration reference](docs/configuration-reference.md) |
+| Review how a signed artifact becomes an environment | [Artifact identity](docs/design/artifact-identity.md) · [promotion contract](docs/design/promotion-contract.md) |
+| Inspect payment and resilience decisions | [Payment contract](docs/design/payment-contract.md) · [failure model](docs/design/failure-model.md) |
+| Reproduce the safe local walkthrough | [Offline demo](docs/demo-walkthrough.md) · [local development](docs/runbooks/local-development.md) |
+| Audit the recorded results | [Verification report](docs/verification-report.md) · [evidence index](docs/evidence/README.md) · [screenshot gallery](docs/screenshots/README.md) |
+| Evaluate the next production engineering steps | [Known limitations](docs/known-limitations.md) |
 
-No mainnet or public-production release is implied. `prod` in this repository
-always means **production-like testnet**.
+This is a completed owned-testnet platform demonstration with explicit limits:
+one zonal cluster, bounded sequential pod-failure scenarios, lab-sized data and
+observability services, and operator-controlled consequential promotions.
+Mainnet payments, financial custody, multi-region availability and compliance
+certification remain outside its verified scope.
+
+<div align="center">
+
+**Identify the candidate. Exercise the failure. Measure recovery. Verify cleanup.**
+
+[Documentation](docs/README.md) · [Evidence gallery](docs/screenshots/README.md) · [Release](https://github.com/devSatym/resilience-gate/releases/tag/v1.0.0)
+
+</div>

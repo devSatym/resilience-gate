@@ -9,6 +9,7 @@ explicit acknowledgements and exact target checks.
 | Script | Default behavior | Mutating behavior |
 | --- | --- | --- |
 | `validate.sh` | Runs credential-free source validation. | None. |
+| `validate-docs.py` | Checks local links/anchors, screenshot hashes/inventory, and reproducible SVG artwork. | None; offline and read-only. |
 | `smoke-local.sh` | Builds and exercises the local unpaid Compose stack, then removes it. | Local containers and disposable volumes only. |
 | `run-loadgen.sh` | Prints and validates a no-network load plan. | `--execute` creates one bounded staging Job after preflight. |
 | `validate-live.sh` | Prints the reviewed scenario plan. | `--execute` requests the selected Kargo Stage verification/promotion path. |
@@ -27,11 +28,18 @@ PYTHON=.venv/bin/python ./scripts/validate.sh
 PYTHON=.venv/bin/python make validate
 ```
 
-The script checks Helm dependencies and rendering for all environments,
+The script checks documentation links, reviewed screenshot hashes, generated
+SVG artwork, Helm dependencies and rendering for all environments,
 Terraform format/init/validation, committed shell syntax, gate-runner inputs,
 committed Kustomizations, the broad pytest suite, signer tests, and Docker
 Compose configuration when Docker is available. It does not apply Terraform,
 contact Kubernetes, promote Freight, start paid load, or inject chaos.
+
+For a quick presentation-only check:
+
+```bash
+python3 scripts/validate-docs.py
+```
 
 ## Local recovery smoke
 

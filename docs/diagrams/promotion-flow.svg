@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="630" viewBox="0 0 1280 630" role="img" aria-labelledby="title desc">
+<title id="title">Verified promotion flow</title>
+<desc id="desc">An immutable Kargo Freight is automatically promoted into dev. Staging and prod-like promotion are manual. Staging checks readiness, paid traffic, serial dependency faults, telemetry and cleanup; prod requires staging-verified Freight and readiness and liveness. Each environment commits rendered YAML for Argo CD.</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101d35"/><stop offset="1" stop-color="#07111f"/></linearGradient><linearGradient id="accent" x2="1" y2="1"><stop stop-color="#53e3c2"/><stop offset="1" stop-color="#70b9ff"/></linearGradient><pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#476079" opacity=".23"/></pattern>
+<marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7" fill="#829db8"/></marker></defs>
+<rect width="1280" height="630" rx="22" fill="url(#bg)"/>
+<rect width="1280" height="630" rx="22" fill="url(#grid)"/>
+<g font-family="DejaVu Sans,Arial,sans-serif">
+<text x="50" y="43" font-size="14" fill="#53e3c2" font-weight="700" text-anchor="start">02 / PROMOTION CONTRACT</text>
+<text x="50" y="91" font-size="34" fill="#edf5ff" font-weight="700" text-anchor="start">A green pod is the beginning of the check.</text>
+<text x="50" y="126" font-size="19" fill="#a9bbd1" font-weight="400" text-anchor="start">The same Freight advances only after the upstream verification succeeds.</text>
+<rect x="50" y="161" width="1180" height="57" rx="16" fill="#102c38" stroke="#315562"/>
+<text x="75" y="197" font-size="21" fill="#53e3c2" font-weight="700" text-anchor="start">FREIGHT = source revision + application image digest</text>
+<text x="1208" y="197" font-size="16" fill="#a9bbd1" font-weight="400" text-anchor="end">immutable candidate</text>
+<rect x="50" y="258" width="358" height="208" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="50" y="274" width="3" height="176" rx="1" fill="#70b9ff"/>
+<text x="71" y="292" font-size="13" fill="#70b9ff" font-weight="700" text-anchor="start">01 / AUTOMATIC</text>
+<text x="71" y="327" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">dev</text>
+<text x="71" y="361" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Render env/dev</text>
+<text x="71" y="390" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Argo CD sync + service health</text>
+<text x="71" y="419" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Eligible for staging</text>
+<rect x="461" y="258" width="358" height="208" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="461" y="274" width="3" height="176" rx="1" fill="#af9bff"/>
+<text x="482" y="292" font-size="13" fill="#af9bff" font-weight="700" text-anchor="start">02 / MANUAL</text>
+<text x="482" y="327" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">staging</text>
+<text x="482" y="361" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Render env/staging</text>
+<text x="482" y="390" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Readiness + chaos verdict</text>
+<text x="482" y="419" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Eligible for prod after PASS</text>
+<rect x="872" y="258" width="358" height="208" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="872" y="274" width="3" height="176" rx="1" fill="#53e3c2"/>
+<text x="893" y="292" font-size="13" fill="#53e3c2" font-weight="700" text-anchor="start">03 / MANUAL</text>
+<text x="893" y="327" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">prod-like testnet</text>
+<text x="893" y="361" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Render env/prod</text>
+<text x="893" y="390" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Readiness + liveness</text>
+<text x="893" y="419" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">No paid load or chaos in smoke</text>
+<path d="M412 360 L451 360" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M823 360 L862 360" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="50" y="497" width="1180" height="72" rx="16" fill="#251e34" stroke="#654458"/>
+<text x="75" y="527" font-size="14" fill="#ff8e9e" font-weight="700" text-anchor="start">FAILED OR MISSING EVIDENCE</text>
+<text x="75" y="554" font-size="20" fill="#edf5ff" font-weight="400" text-anchor="start">The candidate does not become normally eligible for the downstream Stage.</text>
+<text x="50" y="608" font-size="13" fill="#a9bbd1" font-weight="400" text-anchor="start">CONCEPTUAL SOURCE DIAGRAM · runtime evidence is linked separately</text>
+</g></svg>

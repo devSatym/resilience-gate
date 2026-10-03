@@ -1,9 +1,15 @@
-# Artifact identity and immutable delivery policy
+# Artifact identity and immutable delivery contract
 
 **Status:** implemented CI and promotion contract, exercised by the owned
 testnet validation campaign. The recorded result binds source, rendered
 revision, digest-qualified runtime images, and gate identities. A new candidate
 must produce a new identity and verification record.
+
+CI verifies Cosign signatures at publication. Kargo and Argo CD consume
+digest-qualified images, but the current lab has no admission controller or
+promotion step that re-verifies those signatures. `main` is the allowed
+publication ref; GitHub branch protection is not enabled on the current
+private repository plan. These are separate trust boundaries.
 
 ## Core rule
 
@@ -26,8 +32,8 @@ ConfigMap.
 
 ## Identity record
 
-Before an artifact is promotable, CI records an immutable identity tuple. The
-exact storage mechanism can evolve, but all fields are required:
+After a successful publication and signature verification, CI records an
+immutable identity tuple. All fields below are required by the CI record:
 
 ```json
 {
@@ -61,21 +67,27 @@ platform-specific child digest after signing.
 
 1. Pull requests run deterministic validation and image build checks without
    cloud credentials and do not publish a promotable image.
-2. A trusted execution from the configured repository and protected ref runs
+2. A trusted execution from the configured repository and allowed `main` ref runs
    the required tests before it receives registry-write credentials through
    GitHub OIDC. No static service-account key is used.
 3. CI builds and pushes the image, then captures the build action's emitted
    digest. It must not reconstruct identity from a tag lookup.
 4. CI signs that exact digest with keyless Cosign and verifies the signature
    against the expected GitHub issuer, repository, workflow identity, and
-   protected ref.
+   allowed ref.
 5. CI publishes the identity record only after verification succeeds. A
-   failure at any prior step leaves the artifact non-promotable.
+   signing failure produces no verified record, although the preceding push
+   may already have placed an image and discovery tag in the registry.
 
 Verification policy must be exact enough to reject signatures from another
 repository, a fork, an untrusted ref, or an unexpected workflow. A broad
 regular expression that accepts any GitHub identity is not an adequate trust
 policy.
+
+The configured OIDC trust and exact Cosign workflow identity constrain the
+publication path. They do not enforce code review or protected-branch rules.
+An owner review is needed before changing repository visibility or widening
+that trust boundary.
 
 ## Tag policy
 
@@ -102,7 +114,7 @@ inputs, but the final Kubernetes manifest must be equivalent to:
 image: <registry>/<repository>/<image>@sha256:<digest>
 ```
 
-The promotion record binds at least:
+The reviewed release evidence binds at least:
 
 - full source revision;
 - application image digest;
@@ -110,10 +122,18 @@ The promotion record binds at least:
 - gate-runner digest when a chaos gate participates; and
 - verified signature identity.
 
-Staging and production-like promotion must reject a candidate when any binding
-is absent, malformed, mutable, or inconsistent with the signed identity
-record. A later retag, registry cleanup, or Git branch movement must not alter
-the manifest already under verification.
+Kargo carries the selected application digest and chart-source revision into
+rendered manifests; staging gate evidence records the configured runtime
+digests separately. Stage eligibility also depends on upstream verification.
+A later retag or Git branch movement cannot replace the digest already selected
+for that promotion.
+
+The current Warehouse discovers `sha-*` images without checking Cosign or
+requiring the CI identity artifact. No Kubernetes admission policy verifies
+signatures at pull/deploy time. Consequently, the record establishes what CI
+signed and verified for the reviewed candidate; it is not a cluster-wide
+unsigned-image rejection policy. Enforcing the signed identity as a prerequisite
+to discovery and deployment is a future hardening step.
 
 ## Retention and recovery
 

@@ -5,13 +5,17 @@ approved Resilience Gate scenario in the owned testnet lab. It is never a
 place for Kubernetes Secret contents, wallet keys, payment signatures,
 authorization headers, cookies, raw configuration files, or mainnet claims.
 
-The repository contains a small, sanitized set of versioned
-**owned staging-testnet** records: one Kargo-managed chaos-gate pass, an earlier
-failed predecessor and fresh re-verification, plus four manual direct boundary
-tests. A later full validation campaign also completed baseline, paid smoke,
-deliberate regression, corrected recovery, and production-like promotion. Its
-detailed sanitized bundles remain outside Git by default; the reviewed result
-is documented in the [verification report](../verification-report.md).
+The repository contains selected sanitized **owned staging-testnet**
+records: one Kargo-managed chaos-gate pass, an earlier failed predecessor and
+re-verification, plus four manual direct boundary tests. The 2 October
+campaign additionally completed baseline, paid smoke, deliberate regression,
+corrected recovery, and production-like promotion. Fresh `v1.0.0` staging and
+prod-like alignment completed on **3 October 2026**.
+
+Detailed sanitized bundles are retained in a **private external evidence
+archive**. The [verification report](../verification-report.md) records the
+release snapshot, and the [reviewed gallery](../screenshots/README.md) adds
+34 explanatory images with a [portable hash/identity manifest](../screenshots/manifest.json).
 
 A passing unit test, rendered manifest, accepted Kargo request, or empty
 scenario directory is not evidence that a release gate passed. Likewise, the
@@ -37,7 +41,7 @@ detail.
 | [missing telemetry](missing-telemetry/20261002-missing-telemetry-scorer/) | **Fail.** A scorer-only direct test treated a deliberately unreachable Prometheus endpoint as transport-error evidence. |
 | [short deadline cleanup](timeout-cleanup/20261002-timeout-cleanup/) | **Fail.** A direct runner test with a one-second deadline invoked exact-object cleanup before its normal fault phase. |
 
-The final campaign additionally recorded:
+The historical 2 October campaign additionally recorded:
 
 | Record | Outcome and narrow meaning |
 | --- | --- |
@@ -47,9 +51,42 @@ The final campaign additionally recorded:
 | `recovery-20261002-052031` | **Pass.** A corrected staging candidate completed all three fault/recovery scorecards and cleanup. |
 | `prod-smoke-20261002-060326` | **Pass.** Kargo promotion, Argo CD reconciliation, readiness, liveness, 3/3 app replicas, and stateful dependencies all passed. |
 
-These final bundles are not silently represented by empty directories. Their
-status pages point to the report, and their external retention boundary is
-explicit.
+The scenario status pages summarize those historical results. Full bundles
+have an external retention boundary; a status page is not a substitute for a
+bundle or a gate verdict.
+
+## Fresh v1.0.0 alignment — 3 October 2026
+
+The fresh validation used the existing two-node cluster. Staging ran bounded
+paid testnet load and sequential PostgreSQL, Redis, and signer faults. The
+subsequent prod-like promotion ran readiness/liveness smoke without paid load
+or chaos. Both used Freight `d3b4380d40e87e244162da80aae9eb90503be15d`
+(`hoping-warthog`) and application digest
+`sha256:ab88d89c20ccf1a79b9f47f90aa417ac0f54d7852c39b444b7fb788975fdd6a1`.
+
+| Retained bundle | Result and immutable boundary |
+| --- | --- |
+| `chaos-gate/v1-screenshot-20261003T143702Z` | **Pass.** AnalysisRun `staging.01m4135pfqh94e76vzzn7fpbs4.d58be07` completed at `2026-10-03T14:46:28Z`; all three fault/recovery scorecards passed. Rendered staging revision: `64d2ddedb1493e0c59aef9ecad0ad0a2ff4196cf`. |
+| `prod-smoke/v1-prod-screenshot-20261003T153428Z` | **Pass.** AnalysisRun `prod.01m416ezeke4d89a42wkqefzv9.d58be07` completed at `2026-10-03T15:35:29Z`; readiness/liveness passed and the app was `3/3` Ready. Rendered prod revision: `7d334d5a05e747cabff59d28de75e73534afe578`. |
+
+The two bundles contain **36 files and two schema-valid metadata records**.
+Their durable private archive preserves the sanitized collection after the
+temporary collection directory expires. The archive's host path and access
+details are deliberately omitted from public documentation. No symlinks were
+present in the retained copies.
+
+Application release source is `3b70835335462f1b6f9b1dd17ab20d1108724f89`
+(`v1.0.0`); the chart source in Freight is
+`0a98c08ccab5fa7b05efcecf877c714e5c89f025`. These are separate from each
+rendered environment revision. Cleanup removed the exact staging experiment
+objects and run-scoped load Job, suspended its source CronJob, and left no
+active Promotion. The [verification report](../verification-report.md) records
+the full identity chain and final readback.
+
+The fresh GitOps gallery views are [09, 10, 11, 14, 14b, and 29](../screenshots/README.md#the-fresh-v100-release).
+Historical dashboard/payment images remain attached to their earlier candidate
+and UTC window in the manifest. The cleanup screenshot 26 precedes this fresh
+run; its caption gives the earlier boundary explicitly.
 
 ## Use the reviewed verification path
 
@@ -154,10 +191,14 @@ values, then validates the resulting metadata without a cloud dependency.
 - The sanitizer is a safety layer, not authorization to upload raw diagnostics.
   Review output for sensitive material before it enters Git.
 
-## Final evidence audit
+## Evidence audit boundaries
 
-The completed campaign validated 16 metadata records and 238 retained files.
-The final scan found no symlinks, raw-named artifacts, sensitive identity
-patterns, or suspicious long encoded data. Wallet-key and secret-data
-redactions were explicitly recorded where applicable. No raw bundle should be
-copied into this directory without repeating that review.
+| Review | Recorded scope |
+| --- | --- |
+| 2 October validation campaign | 16 metadata records and 238 retained files were audited. The recorded scan found no symlinks, raw-named artifacts, sensitive identity patterns, or suspicious long encoded data; wallet-key and secret-data redactions were recorded where applicable. |
+| 3 October fresh release alignment | Two additional schema-valid metadata records and 36 files were durably retained in the private external archive, with no symlinks. |
+| 2–3 October screenshot campaign | 34 individually reviewed captures; all SHA-256 values rechecked at `2026-10-03T17:26:01Z`. The public manifest records each image's identity and execution/capture boundary. |
+
+These counts describe separate collections. Repeat sanitization and review
+before selecting any new artifact for Git. Raw diagnostics do not belong in
+the repository, and a screenshot cannot replace an AnalysisRun or scorecard.

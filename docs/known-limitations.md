@@ -40,6 +40,10 @@ following deliberate limits.
 - Cosign and digest-qualified references prove the configured identity path for
   the recorded candidates. This project does not claim SLSA certification or
   an independently audited software-supply-chain program.
+- Cosign verification runs in CI after image publication. Kargo discovery and
+  Kubernetes admission do not independently require a verified signature; an
+  image pushed before a signing failure can remain discoverable. Digest pinning
+  preserves selected content but does not establish its trust by itself.
 - The private-key signer narrows key exposure, but it is not a hardware wallet,
   HSM, threshold signer, custody system, or production key-management service.
 
@@ -66,7 +70,9 @@ transaction from this repository.
 - Screenshots are explanatory artifacts, not authoritative verdicts. The
   underlying status, scorecards, revisions, and cleanup records are the source
   of the claim.
-- Live state can drift after the 2 October 2026 snapshot. A later code,
+- Historical October 2 charts and negative tests concern their own candidates;
+  they do not describe the fresh `v1.0.0` staging/prod verification on October 3.
+- Live state can drift after the 3 October 2026 snapshot. A later code,
   dependency, controller, configuration, credential, or infrastructure change
   must repeat the relevant checks.
 
@@ -77,7 +83,14 @@ configuration toggle. It would require decisions and testing for regional or
 multi-cluster architecture, highly available data stores and telemetry,
 backup/restore, SLOs and on-call response, network policy, independent security
 review, key custody, payment reconciliation, capacity planning, cost controls,
-and a production evidence-retention policy.
+and a production evidence-retention policy. Repository hardening also needs
+review: GitHub protection rules, dependency/security scanning, immutable action
+pins, SBOM/provenance generation, and container build reproducibility are not
+established by the current testnet verification.
+
+Making the repository public is a separate presentation and disclosure choice.
+It does not change these operational limits. See the
+[publication review](presentation-readiness.md) for the remaining owner decisions.
 
 The current completion claim remains intentionally precise: the private
 testnet release platform was implemented, deployed, and verified end to end.

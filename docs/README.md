@@ -1,18 +1,31 @@
 # Resilience Gate documentation
 
-This directory is the canonical guide to the platform. Start with the
-[root README](../README.md) for the project overview, then use this index to
-move from architecture to implementation contracts, operations, and evidence.
+Explore the release platform through its architecture, contracts, and
+observed results. The [root README](../README.md) is the visual overview;
+this index leads into the implementation and operating detail.
+
+## Choose a route
+
+| You want to… | Start here |
+| --- | --- |
+| See the system and promotion boundaries | [Architecture diagrams](diagrams/README.md) → [Kubernetes architecture](kubernetes-architecture.md) |
+| Inspect what actually ran | [34-image evidence gallery](screenshots/README.md) → [Verification report](verification-report.md) |
+| Try it without cloud credentials or funds | [Offline demo](demo-walkthrough.md) → [Local development](runbooks/local-development.md) |
+| Understand the release decision | [Promotion contract](design/promotion-contract.md) → [Failure model](design/failure-model.md) |
+| Trace a paid request | [Payment contract](design/payment-contract.md) → [Testnet payment runbook](runbooks/testnet-payments.md) |
+| Audit claims and retained artifacts | [Evidence handling](evidence/README.md) → [Screenshot manifest](screenshots/manifest.json) → [Known limitations](known-limitations.md) |
 
 ## Architecture and verified state
 
 | Document | Purpose |
 | --- | --- |
+| [Architecture diagrams](diagrams/README.md) | Visual platform, promotion, and gate flows with their source and regeneration instructions. |
 | [Kubernetes architecture](kubernetes-architecture.md) | Component ownership, GitOps topology, promotion flow, observability, and failure boundaries. |
 | [Configuration reference](configuration-reference.md) | Public settings, environment profiles, versions, namespaces, identity, and secret-reference rules. |
 | [Verification report](verification-report.md) | Final owned-testnet validation snapshot, exact scope, outcomes, revisions, and evidence audit. |
 | [Known limitations](known-limitations.md) | Explicit non-claims and remaining productionization limits. |
 | [Offline demo](demo-walkthrough.md) | Reproduce source-level checks without cloud credentials, a cluster, or testnet funds. |
+| [Publication review](presentation-readiness.md) | Owner decisions before changing visibility, including license and disclosure review. |
 
 ## Design contracts
 
@@ -38,10 +51,18 @@ move from architecture to implementation contracts, operations, and evidence.
 
 ## Evidence
 
-The [evidence index](evidence/README.md) explains what is retained in Git, what
-is retained outside Git, how sanitization works, and which conclusions each
-record supports. Evidence is scoped to the exact candidate and run. A
-successful historical record does not automatically validate a later change.
+The [gallery](screenshots/README.md) presents **29 canonical views and five
+detail companions** from the reviewed 2–3 October 2026 capture campaign.
+It separates the fresh `v1.0.0` deployment from historical failed,
+recovery, and paid-request scenarios. The [manifest](screenshots/manifest.json)
+binds every published image to its hash, capture time, observed window, and
+visible proof.
+
+The [evidence index](evidence/README.md) explains the tracked sanitized
+records, private external archive, collection workflow, and review rules.
+Evidence supports the exact candidate and run named in each record; use the
+[verification report](verification-report.md) for the current documented
+release snapshot.
 
 ## Documentation rules
 
