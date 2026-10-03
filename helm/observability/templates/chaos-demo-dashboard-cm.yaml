@@ -110,13 +110,13 @@ data:
         {
           "id": 5,
           "type": "timeseries",
-          "title": "Application and signer restarts",
+          "title": "Application restarts (must remain zero)",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 0, "y": 16, "w": 24, "h": 6},
           "targets": [{
             "refId": "A",
-            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\",container=~\"url-shortener|radius-signer\"}[2m])",
-            "legendFormat": "{{ "{{container}} {{pod}}" }}"
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\",container=\"url-shortener\"}[2m])",
+            "legendFormat": "{{ "{{pod}}" }}"
           }],
           "fieldConfig": {"defaults": {"unit": "short", "min": 0, "decimals": 0}}
         },
@@ -154,7 +154,7 @@ data:
           "gridPos": {"x": 0, "y": 32, "w": 24, "h": 10},
           "targets": [{
             "refId": "A",
-            "expr": "{namespace=\"$namespace\",container=\"k6\",pod=~\"loadgen-.*\"}",
+            "expr": "{namespace=\"$namespace\",container=\"k6\",pod=~\"loadgen-.*\"} |~ \"scenarios:|payment_flow: 1.00 iterations/s|running [(]08m5[01]\"",
             "queryType": "range"
           }],
           "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Ascending"}

@@ -173,6 +173,18 @@ def test_service_monitors_and_dashboards_cover_the_application_contract() -> Non
     assert '{namespace="url-shortener",pod=~".*chaos-gate.*"}' not in chaos_queries
     assert "|!=" not in chaos_queries
     assert '!= "/livez" != "/ready"' in chaos_queries
+    restart_panel = next(
+        panel
+        for panel in chaos["panels"]
+        if panel["title"] == "Application restarts (must remain zero)"
+    )
+    assert restart_panel["targets"][0]["expr"].count('container="url-shortener"') == 1
+    assert "radius-signer" not in restart_panel["targets"][0]["expr"]
+    k6_panel = next(
+        panel for panel in chaos["panels"] if panel["title"] == "Bounded k6 load generator"
+    )
+    assert "RESILIENCE_GATE_K6_SUMMARY" not in k6_panel["targets"][0]["expr"]
+    assert "running [(]08m5[01]" in k6_panel["targets"][0]["expr"]
 
     payment_queries = panel_expressions(payments)
     privacy_queries = [

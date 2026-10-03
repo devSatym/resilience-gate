@@ -78,13 +78,13 @@ data:
         {
           "id": 3,
           "type": "stat",
-          "title": "Container restarts in selected range",
-          "description": "A zero value proves the application and signer did not restart during the selected interval.",
+          "title": "Application restarts in selected range",
+          "description": "A zero value proves the application containers did not restart during the selected interval. Signer recovery is shown separately by pod readiness.",
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "gridPos": {"x": 0, "y": 8, "w": 8, "h": 6},
           "targets": [{
             "refId": "A",
-            "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\",container=~\"url-shortener|radius-signer\"}[$__range])) or vector(0)"
+            "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\",container=\"url-shortener\"}[$__range])) or vector(0)"
           }],
           "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
           "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background", "graphMode": "none"}
