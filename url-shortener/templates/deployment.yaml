@@ -64,7 +64,7 @@ spec:
               app.kubernetes.io/instance: url-shortener-staging
       containers:
         - name: url-shortener
-          image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/url-shortener@sha256:a5beda836336de1677e27c3c2ff09a1ab27d9366040cd985c347d700de6f476b"
+          image: "us-central1-docker.pkg.dev/shivam-serverless/resilience-gate/url-shortener@sha256:ab88d89c20ccf1a79b9f47f90aa417ac0f54d7852c39b444b7fb788975fdd6a1"
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
