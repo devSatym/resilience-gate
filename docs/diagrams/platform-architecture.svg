@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="820" viewBox="0 0 1280 820" role="img" aria-labelledby="title desc">
+<title id="title">Resilience Gate platform architecture</title>
+<desc id="desc">GitHub Actions uses OIDC to publish Cosign-signed images. Kargo joins source and image identities, renders environment branches, and requests Argo CD reconciliation. Dev, staging and prod-like namespaces run on one two-node zonal GKE lab with Terraform, External Secrets, and observability.</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101d35"/><stop offset="1" stop-color="#07111f"/></linearGradient><linearGradient id="accent" x2="1" y2="1"><stop stop-color="#53e3c2"/><stop offset="1" stop-color="#70b9ff"/></linearGradient><pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#476079" opacity=".23"/></pattern>
+<marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7" fill="#829db8"/></marker></defs>
+<rect width="1280" height="820" rx="22" fill="url(#bg)"/>
+<rect width="1280" height="820" rx="22" fill="url(#grid)"/>
+<g font-family="DejaVu Sans,Arial,sans-serif">
+<text x="50" y="43" font-size="14" fill="#53e3c2" font-weight="700" text-anchor="start">01 / PLATFORM ARCHITECTURE</text>
+<text x="50" y="91" font-size="34" fill="#edf5ff" font-weight="700" text-anchor="start">One release identity. Three environments.</text>
+<text x="50" y="126" font-size="19" fill="#a9bbd1" font-weight="400" text-anchor="start">Git source + OCI digest → rendered Git → reconciled workload → verification record</text>
+<rect x="50" y="164" width="216" height="169" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="50" y="180" width="3" height="137" rx="1" fill="#70b9ff"/>
+<text x="71" y="198" font-size="13" fill="#70b9ff" font-weight="700" text-anchor="start">SOURCE + CI</text>
+<text x="71" y="233" font-size="19" fill="#edf5ff" font-weight="700" text-anchor="start">GitHub Actions</text>
+<text x="71" y="267" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Validate + build</text>
+<text x="71" y="296" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Keyless OIDC publish</text>
+<path d="M268 248 L284 248" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="291" y="164" width="216" height="169" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="291" y="180" width="3" height="137" rx="1" fill="#af9bff"/>
+<text x="312" y="198" font-size="13" fill="#af9bff" font-weight="700" text-anchor="start">SIGNED ARTIFACTS</text>
+<text x="312" y="233" font-size="19" fill="#edf5ff" font-weight="700" text-anchor="start">Artifact Registry</text>
+<text x="312" y="267" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">App · signer · gate</text>
+<text x="312" y="296" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Cosign + OCI digests</text>
+<path d="M509 248 L525 248" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="532" y="164" width="216" height="169" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="532" y="180" width="3" height="137" rx="1" fill="#53e3c2"/>
+<text x="553" y="198" font-size="13" fill="#53e3c2" font-weight="700" text-anchor="start">CANDIDATE IDENTITY</text>
+<text x="553" y="233" font-size="19" fill="#edf5ff" font-weight="700" text-anchor="start">Kargo Warehouse</text>
+<text x="553" y="267" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Source + image Freight</text>
+<text x="553" y="296" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Stage eligibility</text>
+<path d="M750 248 L766 248" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="773" y="164" width="216" height="169" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="773" y="180" width="3" height="137" rx="1" fill="#70b9ff"/>
+<text x="794" y="198" font-size="13" fill="#70b9ff" font-weight="700" text-anchor="start">REVIEWABLE OUTPUT</text>
+<text x="794" y="233" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">Rendered Git</text>
+<text x="794" y="267" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">env/dev · env/staging</text>
+<text x="794" y="296" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">env/prod manifests</text>
+<path d="M991 248 L1007 248" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="1014" y="164" width="216" height="169" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="1014" y="180" width="3" height="137" rx="1" fill="#ffc776"/>
+<text x="1035" y="198" font-size="13" fill="#ffc776" font-weight="700" text-anchor="start">RECONCILIATION</text>
+<text x="1035" y="233" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">Argo CD</text>
+<text x="1035" y="267" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Track env/* branches</text>
+<text x="1035" y="296" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Apply desired revision</text>
+<rect x="50" y="365" width="1180" height="228" rx="16" fill="#0a1b2d" stroke="#46617b"/>
+<text x="73" y="401" font-size="14" fill="#70b9ff" font-weight="700" text-anchor="start">EXISTING GKE STANDARD LAB</text>
+<text x="1208" y="401" font-size="16" fill="#a9bbd1" font-weight="400" text-anchor="end">1 zone · 2 nodes · e2-standard-4</text>
+<path d="M1122 334 L1122 360" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="75" y="425" width="332" height="145" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="75" y="441" width="3" height="113" rx="1" fill="#70b9ff"/>
+<text x="96" y="459" font-size="13" fill="#70b9ff" font-weight="700" text-anchor="start">URL-SHORTENER-DEV</text>
+<text x="96" y="494" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">dev</text>
+<text x="96" y="528" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">1 app replica</text>
+<text x="96" y="557" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">PostgreSQL + Redis</text>
+<rect x="474" y="425" width="332" height="145" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="474" y="441" width="3" height="113" rx="1" fill="#af9bff"/>
+<text x="495" y="459" font-size="13" fill="#af9bff" font-weight="700" text-anchor="start">URL-SHORTENER-STAGING</text>
+<text x="495" y="494" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">staging</text>
+<text x="495" y="528" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">2 app replicas + signer</text>
+<text x="495" y="557" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Paid load + serial pod faults</text>
+<rect x="873" y="425" width="332" height="145" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="873" y="441" width="3" height="113" rx="1" fill="#53e3c2"/>
+<text x="894" y="459" font-size="13" fill="#53e3c2" font-weight="700" text-anchor="start">URL-SHORTENER-PROD</text>
+<text x="894" y="494" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">prod-like</text>
+<text x="894" y="528" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">3 app replicas</text>
+<text x="894" y="557" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Readiness + liveness smoke</text>
+<path d="M410 490 L466 490" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M809 490 L865 490" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="50" y="625" width="370" height="137" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="50" y="641" width="3" height="105" rx="1" fill="#70b9ff"/>
+<text x="71" y="659" font-size="13" fill="#70b9ff" font-weight="700" text-anchor="start">FOUNDATION</text>
+<text x="71" y="694" font-size="19" fill="#edf5ff" font-weight="700" text-anchor="start">Terraform + Workload Identity</text>
+<text x="71" y="728" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">GCP infrastructure + IAM</text>
+<rect x="455" y="625" width="370" height="137" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="455" y="641" width="3" height="105" rx="1" fill="#af9bff"/>
+<text x="476" y="659" font-size="13" fill="#af9bff" font-weight="700" text-anchor="start">SECRET DELIVERY</text>
+<text x="476" y="694" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">Secret Manager → ESO</text>
+<text x="476" y="728" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Values stay outside Git</text>
+<rect x="860" y="625" width="370" height="137" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="860" y="641" width="3" height="105" rx="1" fill="#53e3c2"/>
+<text x="881" y="659" font-size="13" fill="#53e3c2" font-weight="700" text-anchor="start">FEEDBACK + VERDICT</text>
+<text x="881" y="694" font-size="19" fill="#edf5ff" font-weight="700" text-anchor="start">Prometheus · Loki · Grafana</text>
+<text x="881" y="728" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Scoring + sanitized evidence</text>
+<text x="50" y="798" font-size="13" fill="#a9bbd1" font-weight="400" text-anchor="start">CONCEPTUAL SOURCE DIAGRAM · runtime evidence is linked separately</text>
+</g></svg>

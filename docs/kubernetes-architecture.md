@@ -3,8 +3,13 @@
 **Status: implemented and verified in the private owned-testnet lab.** The
 source and manifests below were exercised through dev baseline, staging paid
 traffic, negative gating, healthy chaos, recovery, and a production-like
-promotion. The [verification report](verification-report.md) captures the
-exact snapshot and evidence boundary.
+promotion. The October 2 campaign established the historical baseline,
+payment, negative, and recovery results; a fresh October 3 run verified
+`v1.0.0` Freight through staging chaos and prod-like smoke. The
+[verification report](verification-report.md) captures both candidates with
+their exact identities and evidence boundaries. The
+[diagram collection](diagrams/README.md) and
+[screenshot gallery](screenshots/README.md) provide the visual tour.
 
 Resilience Gate is deliberately testnet-only. A directory or namespace called
 `prod` represents a production-like testnet boundary, never a mainnet or
@@ -20,8 +25,8 @@ It separates four concerns:
 | --- | --- | --- |
 | Workload | `app/` implements a FastAPI URL shortener; `signer/` is a separate Permit2-signing boundary. | Dev/staging/prod workloads were Ready; the staging paid smoke completed its challenge, settlement, redirect, and replay sequence. |
 | Delivery | Helm values accept digest-qualified image identities, while Kargo templates render environment branches. | All three rendered branches were reconciled; eight Argo CD Applications were Synced/Healthy. |
-| Verification | The chaos gate binds source and workload identity to one bounded Job/Workflow and fail-closed scorecards. | PostgreSQL, Redis, and signer fault/recovery scoring passed for the corrected candidate; a degraded candidate failed before chaos when traffic was absent. |
-| Evidence | Schemas, collectors, sanitizers, and retained summaries bind each result to the observed run. | Sixteen metadata records and 238 retained files passed the final evidence audit. |
+| Verification | The chaos gate binds source and workload identity to one bounded Job/Workflow and fail-closed scorecards. | All three October 3 `v1.0.0` dependency scorecards passed; the historical degraded candidate failed before chaos when paid traffic was absent. |
+| Evidence | Schemas, collectors, sanitizers, and retained summaries bind each result to the observed run. | October 2 historical audit: 16 metadata records / 238 files. October 3: two new privately retained bundles / 36 files, plus 34 reviewed screenshots. |
 
 ## Configured component map
 
@@ -76,6 +81,11 @@ stage require an explicit promotion. The Warehouse may discover a constrained
 environment values. The production-like Stage is active and retains its
 explicit manual-promotion boundary.
 
+Cosign verification belongs to CI publication. The configured Warehouse and
+deployment path do not independently verify signatures or require CI's
+identity record; digest pinning preserves the selected content. See
+[artifact identity](design/artifact-identity.md) for that trust boundary.
+
 ### Observability configuration
 
 The local `helm/observability` chart pins Prometheus, Loki, and Alloy chart
@@ -96,14 +106,19 @@ queries remove wallet address labels before Grafana receives the series.
 The staging stage references both service-health and chaos-gate analyses. The
 gate runner is designed to require a release revision and digest, acquire a
 run-scoped Lease, reject an absent ready target or another active run, start
-bounded load, create the constrained workflow, score its telemetry, and verify
-cleanup on exit. Its scorer treats empty, malformed, non-finite, insufficient,
+bounded load, prove paid traffic from the exact load Job, create the constrained
+workflow, score its telemetry, and verify cleanup on exit. Prometheus evidence
+is evaluated during scoring rather than probed before fault injection. Its
+scorer treats empty, malformed, non-finite, insufficient,
 or stale telemetry as evidence failure rather than a healthy zero.
 
 The production-like stage uses post-deploy liveness and readiness checks after
 its upstream staging boundary. That separation is intentional: a post-deploy
 smoke check cannot replace a prior chaos-gate result. The recorded final path
-successfully executed both layers in order.
+successfully executed both layers in order for the fresh October 3 Freight.
+The runner's successful exit depends on cleanup of its Workflow, fault objects,
+load Job, and Lease. The final independent audit additionally checks residual
+WorkflowNodes and active controller operations.
 
 ## Intended promotion path
 
@@ -118,8 +133,10 @@ flowchart LR
   dev --> devhealth[service-health analysis]
   devhealth --> staging[staging: manual promotion]
   staging --> stghealth[service health]
-  stghealth --> gate[bounded chaos gate]
-  gate --> prod[prod-like testnet: manual promotion]
+  staging --> gate[bounded chaos gate]
+  stghealth --> verified[staging verification succeeds]
+  gate --> verified
+  verified --> prod[prod-like testnet: manual promotion]
   prod --> smoke[post-deploy health smoke]
 
   source --> render[rendered env branches]
@@ -148,7 +165,7 @@ can be reproduced.
 | The chaos target is absent, an older run remains, or another run owns the Lease. | The orchestrator is designed to stop before fault injection. | The nonexistent-service direct test blocked before fault injection; concurrency behavior remains uncollected. |
 | A workflow times out or cleanup cannot be verified. | The final result is forced to fail when run-scoped resources cannot be confirmed absent. | A one-second direct timeout test invoked cleanup; default-duration timeout behavior remains uncollected. |
 | A candidate is manually patched outside the normal path. | Evidence rules require source, render, image, gate, and runtime identities to agree. | Review discipline still matters; manifests cannot make an undocumented patch auditable. |
-| A required release scenario has not run. | The correct state is unavailable/not collected, not pass. | The final campaign collected baseline, deliberate regression, recovery, and production-like smoke; future candidates must collect fresh records. |
+| A required release scenario has not run. | The correct state is unavailable/not collected, not pass. | The historical campaign collected baseline, deliberate regression, recovery, and prod-like smoke; October 3 separately verified the fresh release, and future candidates need their own records. |
 
 ## Explicit trade-offs
 
@@ -180,6 +197,10 @@ from an explicitly approved owned lab. See [evidence handling](evidence/README.m
 [artifact identity](design/artifact-identity.md), and
 [the evidence status directories](evidence/).
 
-The final 2 October 2026 campaign satisfied those conditions for its private
-testnet candidate. That result does not carry forward automatically to a later
-candidate.
+The historical October 2 campaign satisfied those conditions for its recorded
+private testnet candidates. On October 3, fresh staging and prod-like
+AnalysisRuns verified Freight `d3b4380…` with application digest `ab88d89c…`,
+ending dev, staging, and prod on the same candidate. Historical and fresh
+results remain distinct in the [verification report](verification-report.md)
+and [gallery captions](screenshots/README.md). Neither result carries forward
+automatically to a later candidate.

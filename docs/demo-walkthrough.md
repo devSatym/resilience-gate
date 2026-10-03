@@ -1,11 +1,24 @@
-# Reproducible offline demo
+# Explore and reproduce Resilience Gate
+
+Start with the [project overview](../README.md), then follow the
+[architecture](kubernetes-architecture.md),
+[screenshot gallery](screenshots/README.md), and
+[verification report](verification-report.md). The gallery shows release
+publication, fail-closed promotion, fault recovery, payment telemetry, and the
+final aligned pipeline, with each historical window labeled.
+
+The commands below reproduce the local engineering contracts behind that
+presentation. Allow approximately 5–10 minutes once the required tools and
+dependencies are installed; the optional Compose smoke also builds an image.
+
+## Offline walkthrough
 
 This walkthrough demonstrates the repository's local contracts without
 provisioning cloud infrastructure, contacting a Kubernetes cluster, spending
 testnet funds, or claiming a release result. It is intentionally an **offline
 demo**, not an evidence campaign.
 
-## 1. Prepare a local test environment
+### 1. Prepare a local test environment
 
 Install Python 3.12, Docker Compose, Helm, Terraform, and `kubectl` with
 Kustomize support. From the repository root:
@@ -20,7 +33,7 @@ The signer dependency install is included because the full hermetic suite
 imports signer contracts. It does not start a signer, open a wallet, or contact
 an RPC endpoint.
 
-## 2. Exercise hermetic behavior
+### 2. Exercise hermetic behavior
 
 ```bash
 PYTHON=.venv/bin/python make test
@@ -38,7 +51,7 @@ If a local tool is absent, install it rather than weakening the check. A failed
 tool installation or validation result is a local setup issue—not a reason to
 claim a pass.
 
-## 3. Run the local service smoke check (optional)
+### 3. Run the local service smoke check (optional)
 
 ```bash
 make smoke-local
@@ -50,7 +63,7 @@ liveness and steady-state readiness. The script removes its Compose volumes on
 exit. It deliberately uses the local unpaid configuration; it is not a Permit2
 payment test, Kubernetes deployment, chaos experiment, or promotion test.
 
-## 4. Inspect configuration without deploying it (optional)
+### 4. Inspect configuration without deploying it (optional)
 
 Copy the example only if you need to see how public operator identifiers are
 rendered:
@@ -67,7 +80,7 @@ not run bootstrap phases, apply Terraform, authenticate to a cloud account, or
 create a testnet payment as part of this walkthrough. Discard or review the
 rendered diff through the normal project workflow before continuing elsewhere.
 
-## 5. Understand the live-evidence boundary
+### 5. Understand the live-evidence boundary
 
 This walkthrough produces no live evidence. The separately completed owned-lab
 campaign is documented in the [verification report](verification-report.md)

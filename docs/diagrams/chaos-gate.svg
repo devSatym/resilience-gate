@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="724" viewBox="0 0 1280 724" role="img" aria-labelledby="title desc">
+<title id="title">Inside the staging chaos gate</title>
+<desc id="desc">Preflight proves ready target, release identity, paid traffic and an exclusive Lease. The runner measures PostgreSQL, Redis and signer pod failures in sequence, then validates telemetry and scores traffic, errors, latency, restarts and recovery. Successful Job completion also requires exact temporary resource cleanup. Grafana annotations are diagnostic.</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101d35"/><stop offset="1" stop-color="#07111f"/></linearGradient><linearGradient id="accent" x2="1" y2="1"><stop stop-color="#53e3c2"/><stop offset="1" stop-color="#70b9ff"/></linearGradient><pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#476079" opacity=".23"/></pattern>
+<marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7" fill="#829db8"/></marker></defs>
+<rect width="1280" height="724" rx="22" fill="url(#bg)"/>
+<rect width="1280" height="724" rx="22" fill="url(#grid)"/>
+<g font-family="DejaVu Sans,Arial,sans-serif">
+<text x="50" y="43" font-size="14" fill="#53e3c2" font-weight="700" text-anchor="start">03 / STAGING VERIFICATION</text>
+<text x="50" y="91" font-size="34" fill="#edf5ff" font-weight="700" text-anchor="start">Break a dependency. Measure the recovery.</text>
+<text x="50" y="126" font-size="19" fill="#a9bbd1" font-weight="400" text-anchor="start">A bounded gate-runner Job binds every scorecard to the candidate and the experiment window.</text>
+<rect x="50" y="163" width="1180" height="125" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="50" y="179" width="3" height="93" rx="1" fill="#70b9ff"/>
+<text x="71" y="197" font-size="13" fill="#70b9ff" font-weight="700" text-anchor="start">01 / PROVE THE PRECONDITIONS</text>
+<text x="71" y="232" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">Target · release identity · paid traffic · exclusive Lease</text>
+<text x="71" y="266" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Failed preflight exits before fault injection; telemetry is evaluated during scoring.</text>
+<path d="M640 293 L640 316" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="50" y="339" font-size="14" fill="#af9bff" font-weight="700" text-anchor="start">02 / SERIAL POD-FAILURE EXPERIMENTS</text>
+<rect x="50" y="359" width="358" height="129" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="50" y="375" width="3" height="97" rx="1" fill="#af9bff"/>
+<text x="71" y="393" font-size="13" fill="#af9bff" font-weight="700" text-anchor="start">FIRST</text>
+<text x="71" y="428" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">PostgreSQL</text>
+<text x="71" y="462" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Fault → degradation → recovery</text>
+<rect x="461" y="359" width="358" height="129" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="461" y="375" width="3" height="97" rx="1" fill="#af9bff"/>
+<text x="482" y="393" font-size="13" fill="#af9bff" font-weight="700" text-anchor="start">THEN</text>
+<text x="482" y="428" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">Redis</text>
+<text x="482" y="462" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Fault → DB fallback → recovery</text>
+<rect x="872" y="359" width="358" height="129" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="872" y="375" width="3" height="97" rx="1" fill="#af9bff"/>
+<text x="893" y="393" font-size="13" fill="#af9bff" font-weight="700" text-anchor="start">THEN</text>
+<text x="893" y="428" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">Permit2 signer</text>
+<text x="893" y="462" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Fault → availability → recovery</text>
+<path d="M412 418 L451 418" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M823 418 L862 418" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="50" y="524" width="553" height="129" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="50" y="540" width="3" height="97" rx="1" fill="#ffc776"/>
+<text x="71" y="558" font-size="13" fill="#ffc776" font-weight="700" text-anchor="start">03 / FAIL-CLOSED SCORING</text>
+<text x="71" y="593" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">Prometheus-backed scorecards</text>
+<text x="71" y="627" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Traffic · 5xx · p95 · restarts · recovery</text>
+<rect x="677" y="524" width="553" height="129" rx="16" fill="#122139" stroke="#2a3e58"/>
+<rect x="677" y="540" width="3" height="97" rx="1" fill="#53e3c2"/>
+<text x="698" y="558" font-size="13" fill="#53e3c2" font-weight="700" text-anchor="start">04 / CLEANUP BEFORE SUCCESS</text>
+<text x="698" y="593" font-size="23" fill="#edf5ff" font-weight="700" text-anchor="start">Verify exact resources are absent</text>
+<text x="698" y="627" font-size="17" fill="#a9bbd1" font-weight="400" text-anchor="start">Workflow · fault objects · load Job · Lease</text>
+<path d="M609 587 L666 587" fill="none" stroke="#829db8" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="50" y="697" font-size="13" fill="#a9bbd1" font-weight="400" text-anchor="start">Successful Job exit requires scoring + cleanup · annotations are diagnostic · conceptual source diagram</text>
+</g></svg>

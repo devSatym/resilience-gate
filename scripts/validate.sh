@@ -7,6 +7,10 @@ cd "$repo_root"
 
 python_bin=${PYTHON:-python3}
 
+# Keep the published presentation tied to reviewed source and image bytes.
+# This check is offline and never starts a browser, cluster, or paid run.
+"$python_bin" scripts/validate-docs.py
+
 if [[ -d helm/url-shortener || -d helm/observability ]]; then
   command -v helm >/dev/null 2>&1 || {
     echo "helm is required to validate committed Helm charts" >&2
