@@ -13,6 +13,13 @@
 
 **Verdict:** complete and passing for the stated testnet scope
 
+> [!NOTE]
+> **Historical verification, not a live service.** The active owned GCP lab
+> was retired on 4 October 2026. The results below retain their original
+> candidates, digests and execution windows. The later `v1.1.0` source release
+> does not imply new live verification. See the
+> [retirement receipt](lab-retirement.md) and [release notes](releases/v1.1.0.md).
+
 This report joins the October 2 historical validation campaign with the fresh
 October 3 `v1.0.0` staging and prod-like verification. Each result names its
 own source, runtime identity, and time window. The platform and application

@@ -6,11 +6,12 @@
 
 <p><strong>An immutable release. Real paid testnet traffic. Three dependency failures.<br/>One evidence-backed promotion decision.</strong></p>
 
-[![CI snapshot](https://img.shields.io/badge/CI_snapshot-passing-22c55e?style=flat-square)](https://github.com/devSatym/resilience-gate/actions/runs/37123284920)
-[![Release](https://img.shields.io/badge/release-v1.0.0-14b8a6?style=flat-square)](https://github.com/devSatym/resilience-gate/releases/tag/v1.0.0)
+[![CI](https://github.com/devSatym/resilience-gate/actions/workflows/validate.yaml/badge.svg?branch=main)](https://github.com/devSatym/resilience-gate/actions/workflows/validate.yaml)
+[![Release](https://img.shields.io/github/v/release/devSatym/resilience-gate?style=flat-square&color=14b8a6)](https://github.com/devSatym/resilience-gate/releases/latest)
 [![Tests](https://img.shields.io/badge/project_tests-231_passing-22c55e?style=flat-square)](docs/verification-report.md)
 [![Signer](https://img.shields.io/badge/signer_tests-13_passing-22c55e?style=flat-square)](signer/test_permit2.py)
 [![Scope](https://img.shields.io/badge/verified-owned_testnet-38bdf8?style=flat-square)](docs/known-limitations.md)
+[![License](https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square)](LICENSE)
 
 <p>
 <a href="#see-the-platform">See the platform</a> ·
@@ -51,6 +52,13 @@ the candidate becomes eligible for the production-like testnet Stage.
 > `prod` means **production-like testnet** throughout this repository.
 > Exact source, chart, render, image and analysis identities are in the
 > [verification report](docs/verification-report.md).
+>
+> **Lab retired: 4 October 2026.** The active GCP lab has been deleted;
+> screenshots and live results are historical evidence, not a running demo.
+> [`v1.1.0`](docs/releases/v1.1.0.md) packages the later observability,
+> evidence and repository improvements; it does not claim a new live deployment.
+> See the [retirement receipt](docs/lab-retirement.md) for the deletion scope
+> and Google-managed recovery-retention exceptions.
 
 ## The engineering behind the verdict
 
@@ -224,7 +232,7 @@ signer boundaries and settlement/persistence consistency limits.
 | Check | Recorded result |
 | --- | --- |
 | **Source validation** | 231 project tests passed; 1 integration test intentionally deselected locally. 13 signer tests passed. Helm, Terraform, Kustomize, shell, Compose and diagram checks passed. |
-| **CI** | The latest audited `main` validation run passed at `7ea5e91`; CI also exercises the marked local recovery integration test and builds all three runtime images. |
+| **CI** | The recorded live campaign used validated platform source `7ea5e91`. Later presentation snapshot `2420ff4` also passed [all three CI jobs](https://github.com/devSatym/resilience-gate/actions/runs/37188456168); the badge above reports current `main`. CI exercises the marked local recovery integration test and builds all three runtime images without publishing them. |
 | **Fixed lab** | Two `e2-standard-4` nodes, GKE Standard, Workload Identity; the fresh staging/prod campaign created or resized no cloud resources. |
 | **Reconciliation and secrets** | Eight Argo CD Applications healthy/synced; all nine ExternalSecrets ready; populated Prometheus target pools up. |
 | **Fresh staging gate** | Freight `d3b4380…` passed PostgreSQL, Redis and signer scorecards on 3 October; readiness and `chaos-verdict` succeeded. |
@@ -342,10 +350,16 @@ observability services, and operator-controlled consequential promotions.
 Mainnet payments, financial custody, multi-region availability and compliance
 certification remain outside its verified scope.
 
+## License
+
+Resilience Gate is licensed under [Apache 2.0](LICENSE). See [NOTICE](NOTICE)
+for attribution. Third-party dependencies and vendored Helm charts retain
+their own licences and notices.
+
 <div align="center">
 
 **Identify the candidate. Exercise the failure. Measure recovery. Verify cleanup.**
 
-[Documentation](docs/README.md) · [Evidence gallery](docs/screenshots/README.md) · [Release](https://github.com/devSatym/resilience-gate/releases/tag/v1.0.0)
+[Documentation](docs/README.md) · [Evidence gallery](docs/screenshots/README.md) · [Latest release](https://github.com/devSatym/resilience-gate/releases/latest)
 
 </div>

@@ -25,18 +25,37 @@ run bundles remain in a private external archive.
 
 ## Owner publication and disclosure review
 
-- Choose whether public reuse is permitted and, if so, select a license. No
-  license has been chosen on the owner's behalf.
+- The owner selected [Apache 2.0](../LICENSE) for the new source release.
+  Preserve the [NOTICE](../NOTICE) and third-party attribution when distributing.
 - Review the committed screenshots and diagrams at full size, including the
   visible project IDs, repository username, and system identities.
 - Scan the full Git history for credentials or private material, not only the
   current tree. Ignored configuration and Terraform state remain local.
-- Decide whether to enable public-repository protection rules and security
-  features. GitHub reported `main` as unprotected at the 4 October review.
+- Review remaining public-repository protection rules. GitHub reported `main`
+  as unprotected at the 4 October review; no restriction was imposed on the
+  owner's direct-merge workflow or machine-owned `env/*` branches.
 - Recheck README badges, links, release visibility, and workflow results after
   documentation updates reach `main`.
 
-The security backlog includes dependency alerts/scanning, a security policy,
-CODEOWNERS, immutable action pins, reproducible base images, and
-SBOM/provenance generation. These are disclosed engineering follow-ups; the
-presentation update does not assert that they have been implemented.
+## October 4 repository release review
+
+- About description, documentation homepage and 20 implementation-related
+  topics were populated.
+- Apache 2.0 and an attribution notice were added following the owner's
+  explicit licence choice; no older tag was rewritten.
+- Secret scanning, secret push protection, dependency vulnerability alerts and
+  private vulnerability reporting were enabled and checked through GitHub.
+  Automatic dependency-fix PRs were not enabled.
+- A [security policy](../SECURITY.md) and structured bug/enhancement issue forms
+  were added, with a prohibition on publishing credentials or private evidence.
+- The [v1.1.0 release](releases/v1.1.0.md) preserves the `v1.0.0` tag and its
+  original runtime evidence. Current CI/release badges link to GitHub status.
+- The [lab retirement](lab-retirement.md) is explicit: screenshots represent
+  historical observations and mandatory cloud recovery records remain separate
+  from deleted active resources.
+
+The remaining security backlog includes full-history credential review,
+branch protection, CODEOWNERS, immutable action pins, reproducible base images,
+SBOM/provenance generation and ongoing vulnerability triage. Enabled scanning
+is not evidence of a completed security audit. The licence was selected
+explicitly by the owner, not inferred from public repository visibility.

@@ -1,5 +1,12 @@
 # Contributing to Resilience Gate
 
+## License and reporting
+
+The project uses [Apache 2.0](LICENSE); contributions intentionally submitted
+for inclusion follow that licence unless explicitly stated otherwise.
+Preserve third-party licences and attribution notices. Report vulnerabilities
+privately through the [security policy](SECURITY.md), not public issues.
+
 ## Branch and commit policy
 
 Use a short-lived branch for one coherent change. Branch names follow the

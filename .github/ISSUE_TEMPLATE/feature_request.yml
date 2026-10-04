@@ -1,0 +1,60 @@
+name: Feature request
+description: Suggest a concrete improvement within the project's documented scope.
+title: "[Feature]: "
+labels: [enhancement, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Review [CONTRIBUTING.md](https://github.com/devSatym/resilience-gate/blob/main/CONTRIBUTING.md) and the [known limitations](https://github.com/devSatym/resilience-gate/blob/main/docs/known-limitations.md).
+        Send security-sensitive reports through the [security policy](https://github.com/devSatym/resilience-gate/blob/main/SECURITY.md).
+        The GCP lab was retired on 4 October 2026; retained evidence describes its original candidates and observation windows.
+        A feature request does not authorize cloud deployment, spending funds, paid traffic, fault injection, or testing systems you do not own.
+  - type: input
+    id: version
+    attributes:
+      label: Version or revision reviewed
+      description: Give the release tag or Git commit used to assess the current behavior.
+      placeholder: v1.1.0 or full commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Use case and local validation context
+      description: Describe the affected component, local environment, and any commands or documentation reviewed. State if no checks were run; cloud testing is not required.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Current behavior or limitation
+      description: Explain the current result and why it does not meet the use case. Link the relevant source or documented contract.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Desired behavior
+      description: Describe the concrete improvement and how a reviewer could verify it locally.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Sanitized example or reproduction
+      description: Give a minimal example with synthetic inputs and placeholders. Historical evidence must retain its original candidate, revision, and time window.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional workarounds or other approaches, including relevant tradeoffs.
+  - type: checkboxes
+    id: disclosure
+    attributes:
+      label: Disclosure check
+      options:
+        - label: I have removed credentials, tokens, cloud secrets, kubeconfigs, private configuration, Terraform state, wallet keys or addresses, payment headers or signatures, transaction identifiers, and cookies from this report and its attachments.
+          required: true
