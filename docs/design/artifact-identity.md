@@ -8,8 +8,8 @@ must produce a new identity and verification record.
 CI verifies Cosign signatures at publication. Kargo and Argo CD consume
 digest-qualified images, but the current lab has no admission controller or
 promotion step that re-verifies those signatures. `main` is the allowed
-publication ref; GitHub branch protection is not enabled on the current
-private repository plan. These are separate trust boundaries.
+publication ref; GitHub branch protection was not enabled at the 4 October
+2026 repository review. These are separate trust boundaries.
 
 ## Core rule
 

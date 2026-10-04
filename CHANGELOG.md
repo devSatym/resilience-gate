@@ -11,6 +11,9 @@ created only after the associated evidence checkpoint is actually verified.
   and release-gate evidence, with privacy-safe wallet-index labels.
 - A reviewed screenshot gallery and architecture diagrams linked from the
   project README, plus an updated October 3 verification report.
+- The original architecture, promotion and chaos-gate illustrations restored
+  in the README, with earlier design labels distinguished from current runtime
+  configuration.
 
 ### Fixed
 

@@ -1,8 +1,30 @@
 # Architecture artwork and sources
 
-The README uses a cohesive set of local SVGs. They remain sharp when enlarged,
-work in GitHub's light and dark themes, and can be regenerated without a
-graphics service, vendor download, or Python package installation.
+The root README displays the project's three original architecture PNGs,
+restored unchanged at the owner's request. Its banner, technology tiles and
+payment-flow illustration use local SVGs. The editable vector alternatives
+remain available alongside the original artwork.
+
+## Original illustrations displayed in the README
+
+| Artwork | Role |
+| --- | --- |
+| [Original platform architecture](01-platform-architecture.png) | Initial platform overview |
+| [Original promotion flow](02-promotion-flow.png) | Initial staged delivery overview |
+| [Original chaos gate](03-chaos-gate.png) | Initial paid-load and fault-verification overview |
+
+These PNGs are design illustrations, not runtime evidence. Embedded
+project/cluster names, node sizes, namespaces, replica counts and the Promtail
+label reflect an earlier configuration. The
+[current architecture](../kubernetes-architecture.md) and
+[verification report](../verification-report.md) document the deployed topology
+and exact results. No editable source or regeneration claim is made for the
+original PNGs.
+
+## Editable vector artwork
+
+The SVGs can be regenerated without a graphics service, vendor download, or
+Python package installation.
 
 | Artwork | What it explains | Editable source |
 | --- | --- | --- |
@@ -26,19 +48,20 @@ python3 scripts/validate-docs.py
 The generator uses Python's standard library. Layout, text, colors, paths, and
 accessible titles/descriptions are reviewed source, not generated from a live
 cluster. SVGs contain no scripts, fonts loaded from the network, or linked
-external images. Technology tiles are original illustrations, not official
-vendor logos; no third-party image assets are bundled.
+external images. The generated technology tiles are original illustrations,
+not official vendor logos; the vector set does not bundle third-party images.
+The inherited PNGs contain vendor marks and are not covered by that claim.
 
-The diagrams describe the repository contracts. They use one zonal GKE lab
-with two `e2-standard-4` nodes, dev/staging/prod application replica counts of
-1/2/3, the actual `resilience-gate` control namespace, and staging-only paid
+The vector diagram alternatives describe the repository contracts. They use
+one zonal GKE lab with two `e2-standard-4` nodes, 1/2/3 application replicas
+in dev/staging/prod, the actual `resilience-gate` control namespace, and staging-only paid
 chaos verification. Configuration details are in the
 [Kubernetes architecture](../kubernetes-architecture.md). A diagram is not a
 runtime verdict; exact results belong in the
 [verification report](../verification-report.md) and
 [reviewed screenshot gallery](../screenshots/README.md).
 
-The old raster diagrams were retired during the October 3 presentation
-refresh because they contained superseded cluster identifiers, node sizes,
-namespaces, or replica counts. Their local originals were preserved in a
-private recovery archive. The current SVG sources replace them completely.
+The three original PNGs were briefly archived during the October 3 presentation
+refresh, then restored for the root README. Their earlier configuration labels
+are explicitly distinguished from the current vector alternatives and runtime
+evidence.
