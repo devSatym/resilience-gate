@@ -88,8 +88,8 @@ review: GitHub protection rules, dependency/security scanning, immutable action
 pins, SBOM/provenance generation, and container build reproducibility are not
 established by the current testnet verification.
 
-Making the repository public is a separate presentation and disclosure choice.
-It does not change these operational limits. See the
+Public repository visibility is a presentation and disclosure boundary, not
+production certification. It does not change these operational limits. See the
 [publication review](presentation-readiness.md) for the remaining owner decisions.
 
 The current completion claim remains intentionally precise: the private

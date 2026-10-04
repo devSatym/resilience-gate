@@ -119,7 +119,15 @@ scorecards carry the run identities and verdicts.
 
 ## Architecture
 
-[![Platform architecture: signed image publication, staged GitOps, workload identity, observability and the chaos gate](docs/diagrams/platform-architecture.svg)](docs/kubernetes-architecture.md)
+[![Original platform architecture illustration](docs/diagrams/01-platform-architecture.png)](docs/kubernetes-architecture.md)
+
+[View the original platform diagram at full size](docs/diagrams/01-platform-architecture.png).
+
+The original design diagrams are retained unchanged. Embedded names, sizing,
+namespaces, replica counts and the Promtail label reflect an earlier setup;
+the [current architecture](docs/kubernetes-architecture.md) and
+[verification report](docs/verification-report.md) document the deployed
+topology and results.
 
 | Owner | Responsibility |
 | --- | --- |
@@ -132,7 +140,7 @@ scorecards carry the run identities and verdicts.
 
 ### The promotion path
 
-[![Promotion flow from immutable Freight through dev health, staging chaos verification and prod smoke](docs/diagrams/promotion-flow.svg)](docs/design/promotion-contract.md)
+[![Original staged promotion overview](docs/diagrams/02-promotion-flow.png)](docs/design/promotion-contract.md)
 
 Successful staging verification makes the Freight eligible for downstream
 selection. The prod-like promotion then performs Argo CD sync plus readiness
@@ -141,7 +149,7 @@ and liveness checks; it does not repeat the paid chaos run.
 <details>
 <summary><strong>Inside the fail-closed gate</strong></summary>
 
-![Gate lifecycle from identity and Lease preflight through paid load, serial faults, scoring and cleanup](docs/diagrams/chaos-gate.svg)
+[![Original chaos verification gate illustration](docs/diagrams/03-chaos-gate.png)](docs/diagrams/03-chaos-gate.png)
 
 | Guard | Verdict when the contract cannot be proven |
 | --- | --- |

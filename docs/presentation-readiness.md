@@ -1,9 +1,10 @@
 # Publication review
 
 Resilience Gate has a documented release, reproducible local checks, reviewed
-architecture diagrams, and a captioned screenshot gallery. The repository
-remains private until its owner chooses to publish it. Publication does not
-change the owned-testnet scope or the [known limitations](known-limitations.md).
+architecture diagrams, and a captioned screenshot gallery. GitHub reported
+the repository as public during the 4 October 2026 documentation review;
+this update did not change its visibility. Publication does not change the
+owned-testnet scope or the [known limitations](known-limitations.md).
 
 ## Presentation package
 
@@ -22,7 +23,7 @@ and AnalysisRuns separately. Historical charts and negative candidates retain
 their dates; they are not relabeled as fresh release results. Detailed sanitized
 run bundles remain in a private external archive.
 
-## Owner review before changing visibility
+## Owner publication and disclosure review
 
 - Choose whether public reuse is permitted and, if so, select a license. No
   license has been chosen on the owner's behalf.
@@ -31,9 +32,9 @@ run bundles remain in a private external archive.
 - Scan the full Git history for credentials or private material, not only the
   current tree. Ignored configuration and Terraform state remain local.
 - Decide whether to enable public-repository protection rules and security
-  features. The current private plan does not expose branch protection.
+  features. GitHub reported `main` as unprotected at the 4 October review.
 - Recheck README badges, links, release visibility, and workflow results after
-  the presentation branch reaches `main`.
+  documentation updates reach `main`.
 
 The security backlog includes dependency alerts/scanning, a security policy,
 CODEOWNERS, immutable action pins, reproducible base images, and

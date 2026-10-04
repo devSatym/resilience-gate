@@ -19,13 +19,13 @@ this index leads into the implementation and operating detail.
 
 | Document | Purpose |
 | --- | --- |
-| [Architecture diagrams](diagrams/README.md) | Visual platform, promotion, and gate flows with their source and regeneration instructions. |
+| [Architecture diagrams](diagrams/README.md) | Original illustrations and reviewed vector flows, with available source and regeneration instructions. |
 | [Kubernetes architecture](kubernetes-architecture.md) | Component ownership, GitOps topology, promotion flow, observability, and failure boundaries. |
 | [Configuration reference](configuration-reference.md) | Public settings, environment profiles, versions, namespaces, identity, and secret-reference rules. |
 | [Verification report](verification-report.md) | Final owned-testnet validation snapshot, exact scope, outcomes, revisions, and evidence audit. |
 | [Known limitations](known-limitations.md) | Explicit non-claims and remaining productionization limits. |
 | [Offline demo](demo-walkthrough.md) | Reproduce source-level checks without cloud credentials, a cluster, or testnet funds. |
-| [Publication review](presentation-readiness.md) | Owner decisions before changing visibility, including license and disclosure review. |
+| [Publication review](presentation-readiness.md) | License, disclosure, visibility, and repository-hardening review. |
 
 ## Design contracts
 
