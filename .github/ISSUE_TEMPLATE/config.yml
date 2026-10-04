@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation and local validation
+    url: https://github.com/devSatym/resilience-gate/blob/main/docs/README.md
+    about: Start with the documentation, offline demo, and local validation instructions.
+  - name: Security policy and confidential reporting
+    url: https://github.com/devSatym/resilience-gate/blob/main/SECURITY.md
+    about: Report suspected vulnerabilities privately using the security policy; do not disclose credentials or wallet data.

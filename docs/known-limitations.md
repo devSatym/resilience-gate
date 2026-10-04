@@ -8,6 +8,10 @@ following deliberate limits.
 
 ## Scope limits
 
+- **Retired deployment.** The active GCP lab was deleted on 4 October 2026.
+  Screenshots and live results describe historical observations. The latest
+  source release does not provide a hosted demo or claim a newly verified
+  runtime. See the [retirement receipt](lab-retirement.md).
 - **Testnet only.** `prod` means a production-like Radius testnet environment.
   There is no mainnet, public-production, regulated-payment, custody, or
   compliance claim.
@@ -30,8 +34,9 @@ following deliberate limits.
 
 ## Security and identity boundaries
 
-- Secret values remain in GCP Secret Manager and are materialized by External
-  Secrets Operator. The repository proves reference and access contracts, not
+- In a deployed lab, Secret values reside in GCP Secret Manager and are
+  materialized by External Secrets Operator. The retired lab's 26 secrets were
+  deleted. The repository proves reference and access contracts, not
   organizational rotation policy, incident response, or independent secret
   audit.
 - Workload Identity and GitHub OIDC avoid long-lived cloud keys in the normal
@@ -84,9 +89,11 @@ multi-cluster architecture, highly available data stores and telemetry,
 backup/restore, SLOs and on-call response, network policy, independent security
 review, key custody, payment reconciliation, capacity planning, cost controls,
 and a production evidence-retention policy. Repository hardening also needs
-review: GitHub protection rules, dependency/security scanning, immutable action
-pins, SBOM/provenance generation, and container build reproducibility are not
-established by the current testnet verification.
+review: GitHub protection rules, immutable action pins, SBOM/provenance generation,
+and container build reproducibility are not established by the current testnet
+verification. Repository secret scanning, push protection, dependency alerts and
+private vulnerability reporting were enabled on October 4; this does not
+establish vulnerability-free dependencies or an independent security audit.
 
 Public repository visibility is a presentation and disclosure boundary, not
 production certification. It does not change these operational limits. See the

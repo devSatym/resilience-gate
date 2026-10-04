@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible, non-sensitive problem with Resilience Gate.
+title: "[Bug]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report vulnerabilities through the [security policy](https://github.com/devSatym/resilience-gate/blob/main/SECURITY.md).
+        Review [CONTRIBUTING.md](https://github.com/devSatym/resilience-gate/blob/main/CONTRIBUTING.md) and the [known limitations](https://github.com/devSatym/resilience-gate/blob/main/docs/known-limitations.md).
+        The GCP lab was retired on 4 October 2026. Historical evidence applies only to its original candidate and observation window.
+        This form does not authorize cloud deployment, paid traffic, fault injection, or testing systems you do not own.
+  - type: input
+    id: version
+    attributes:
+      label: Version or revision
+      description: Give the release tag and exact Git commit, if available.
+      placeholder: v1.1.0 or full commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and local validation
+      description: Include the affected component, OS, tool versions, and local commands run with their outcomes. State if a check was not run; cloud testing is not required.
+      placeholder: Component, OS, Python/Docker/Helm versions, validation command and sanitized result.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Sanitized steps to reproduce
+      description: Provide minimal steps and synthetic inputs. Replace private identifiers and configuration with placeholders.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Explain the expected result and link the relevant documented contract when possible.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Describe the observed result. Any historical evidence must identify its original candidate, revision, and time window.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Optional, narrowly scoped evidence. Review every excerpt and image for sensitive data before posting.
+  - type: checkboxes
+    id: disclosure
+    attributes:
+      label: Disclosure check
+      options:
+        - label: I have removed credentials, tokens, cloud secrets, kubeconfigs, private configuration, Terraform state, wallet keys or addresses, payment headers or signatures, transaction identifiers, and cookies from this report and its attachments.
+          required: true

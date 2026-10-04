@@ -26,6 +26,10 @@ this index leads into the implementation and operating detail.
 | [Known limitations](known-limitations.md) | Explicit non-claims and remaining productionization limits. |
 | [Offline demo](demo-walkthrough.md) | Reproduce source-level checks without cloud credentials, a cluster, or testnet funds. |
 | [Publication review](presentation-readiness.md) | License, disclosure, visibility, and repository-hardening review. |
+| [Lab retirement](lab-retirement.md) | October 4 deletion receipt, historical-evidence boundary, and mandatory recovery retention. |
+| [Release guide](releases/README.md) | Versioning, source identity, validation, release assets and safe publishing. |
+| [v1.1.0 notes](releases/v1.1.0.md) | Observability, evidence, repository improvements and release non-claims. |
+| [Security policy](../SECURITY.md) | Confidential vulnerability reporting and sensitive-data handling. |
 
 ## Design contracts
 
@@ -63,6 +67,10 @@ records, private external archive, collection workflow, and review rules.
 Evidence supports the exact candidate and run named in each record; use the
 [verification report](verification-report.md) for the current documented
 release snapshot.
+
+The owned GCP lab was retired on **4 October 2026**. These records remain useful
+for review, but do not indicate an active deployment or a new runtime verification
+for `v1.1.0`. The [retirement receipt](lab-retirement.md) records the final scope.
 
 ## Documentation rules
 
