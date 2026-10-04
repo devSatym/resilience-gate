@@ -65,17 +65,29 @@ the candidate becomes eligible for the production-like testnet Stage.
 
 ## See the platform
 
+Release orchestration, running workloads, recovery and payments—captured from
+the owned lab. Click any screenshot to inspect its original resolution;
+the [reviewed gallery](docs/screenshots/README.md) records each image's exact scope.
+
 ### One release through three Stages
 
-[![Kargo pipeline with the same release Freight across dev, staging and prod](docs/screenshots/assets/10-kargo-pipeline-final.png)](docs/screenshots/README.md#the-fresh-v100-release)
+[![Kargo pipeline with the same release Freight across dev, staging and prod](docs/screenshots/assets/10-kargo-pipeline-final.png)](docs/screenshots/assets/10-kargo-pipeline-final.png)
 
 The final **3 October** pipeline shows `hoping-warthog` in all three Stages.
 The production-like Argo CD application reconciled `env/prod` revision
 `7d334d5` with all three application replicas Ready.
 
+### GitOps delivery, down to the running Pods
+
+[![Fresh production-like Argo CD resource tree synced and healthy at revision 7d334d5](docs/screenshots/assets/29-argocd-prod-resource-tree.png)](docs/screenshots/assets/29-argocd-prod-resource-tree.png)
+
+**Fresh release · 3 October.** The prod-like application is `Synced` and
+`Healthy`: 21 green resources, three Ready application Pods, and rendered
+revision `7d334d5`. This is owned-testnet delivery, not a public-production claim.
+
 ### Failure, traffic and recovery in the same time window
 
-[![Grafana traffic, errors, latency and dependency recovery during the historical successful chaos run](docs/screenshots/assets/17-grafana-chaos-overview.png)](docs/screenshots/README.md#recovery-under-real-traffic)
+[![Grafana traffic, errors, latency and dependency recovery during the historical successful chaos run](docs/screenshots/assets/17-grafana-chaos-overview.png)](docs/screenshots/assets/17-grafana-chaos-overview.png)
 
 This is the **2 October historical successful run**, displayed over its exact
 UTC window. PostgreSQL, Redis and signer outage/recovery traces are correlated
@@ -83,32 +95,55 @@ with paid traffic, 5xx rate and route p95. The fresh **3 October** candidate
 passed a separate gate; its identities and scorecards are recorded in the
 [verification report](docs/verification-report.md).
 
+### Paid traffic, settlement and signer readiness
+
+[![Historical payment dashboard with settlement success, facilitator latency and anonymized signer readiness](docs/screenshots/assets/23-grafana-payment-settlement.png)](docs/screenshots/assets/23-grafana-payment-settlement.png)
+
+**Historical recovery · 2 October, 05:21:00–05:30:30 UTC.** The dashboard shows
+`100%` settlement success and zero replay attempts within that window, alongside
+facilitator latency and signer throughput. Wallet readiness uses `wallet_index`,
+not addresses. A separate sanitized HTTP smoke recorded
+**`402 → signed 201 → redirect 302 → replay 409`**; it is not the dashboard's
+zero-replay-attempt observation.
+
 <details>
-<summary><strong>Explore the blocked candidate, payment path and final prod reconciliation</strong></summary>
+<summary><strong>Inspect the green PASS, red FAIL, blocked candidate and run-scoped logs</strong></summary>
+
+#### The fresh staging gate returns an explicit PASS
+
+[![Fresh Kargo staging AnalysisRun with Analysis passed and successful readiness and chaos-verdict](docs/screenshots/assets/11-kargo-analysisrun-pass.png)](docs/screenshots/assets/11-kargo-analysisrun-pass.png)
+
+**Fresh release · 3 October.** The staging AnalysisRun passed both `readiness`
+and `chaos-verdict` during `14:37:29–14:46:28 UTC`. Its exact identity and Kargo
+verification-history mapping are in the
+[fresh-release gallery](docs/screenshots/README.md#the-fresh-v100-release).
+
+#### Readiness alone cannot turn a failed gate green
+
+[![Historical Kargo AnalysisRun with successful readiness but failed chaos-verdict and Analysis failed](docs/screenshots/assets/12b-kargo-staging-failed-metrics.png)](docs/screenshots/assets/12b-kargo-staging-failed-metrics.png)
+
+**Historical negative scenario · 2 October.** `intentional-liger` passed
+readiness but failed `chaos-verdict` during paid-traffic preflight. Fault
+injection never began, and staging verification did not pass. This is a
+different candidate and run from the fresh green PASS above.
 
 #### A failed staging candidate stays ineligible
 
-[![Kargo production promotion selection disables Freight that did not pass staging](docs/screenshots/assets/13-kargo-prod-ineligible-freight.png)](docs/screenshots/README.md#when-the-gate-says-no)
+[![Kargo production promotion selection disables Freight that did not pass staging](docs/screenshots/assets/13-kargo-prod-ineligible-freight.png)](docs/screenshots/assets/13-kargo-prod-ineligible-freight.png)
 
 Historical Freight `intentional-liger` failed staging and was verified only in
 dev. Kargo v1.3 disables it in the normal prod promotion selector. The capture
 was cancelled without creating an approval or Promotion.
 
-#### Paid traffic has observable outcomes
+#### The logs connect degradation, PASS and application stability
 
-[![Historical payment and facilitator dashboard with settlement success and privacy-safe wallet readiness](docs/screenshots/assets/23-grafana-payment-settlement.png)](docs/screenshots/README.md#the-paid-request-path)
+[![Historical Grafana evidence with zero application restarts, fault-window 503s, explicit PASS and cleanup logging](docs/screenshots/assets/17b-grafana-chaos-evidence.png)](docs/screenshots/assets/17b-grafana-chaos-evidence.png)
 
-The retained historical payment window shows settlement outcomes, facilitator
-latency and signer readiness. Wallet panels aggregate by `wallet_index`;
-addresses and payment payloads are excluded. The separate sanitized HTTP
-smoke recorded **`402 → signed 201 → redirect 302 → replay 409`**.
-
-#### The promoted candidate reaches a healthy resource tree
-
-[![Fresh production-like Argo CD application synced and healthy at revision 7d334d5](docs/screenshots/assets/29-argocd-prod-resource-tree.png)](docs/screenshots/README.md#the-fresh-v100-release)
-
-The **3 October** prod resource tree shows the freshly promoted release:
-`Synced`, `Healthy`, 21 green resources and three Ready application Pods.
+**Historical recovery · 2 October, 05:21:00–05:30:30 UTC.** The companion view
+shows zero application restarts, scoped `/shorten` degradation, an explicit
+`GATE VERDICT: PASS`, cleanup logging and bounded paid-load excerpts. It belongs
+to the same earlier candidate as the recovery charts; the fresh release's
+cleanup audit is recorded separately in the verification report.
 
 </details>
 
